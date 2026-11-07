@@ -59,13 +59,13 @@ class Settings:
     PUBLIC_BASE_URL: str = field(
         default_factory=lambda: os.getenv(
             "PUBLIC_BASE_URL",
-            os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8000"),
+            os.getenv("RENDER_EXTERNAL_URL", "https://kargo-takip-pod.onrender.com"),
         ).rstrip("/")
     )
     PUBLIC_TRACKING_WEB_URL: str = field(
         default_factory=lambda: os.getenv(
             "PUBLIC_TRACKING_WEB_URL",
-            f"{os.getenv('PUBLIC_BASE_URL', os.getenv('RENDER_EXTERNAL_URL', 'http://localhost:8000')).rstrip('/')}/#/track",
+            f"{os.getenv('PUBLIC_BASE_URL', os.getenv('RENDER_EXTERNAL_URL', 'https://kargo-takip-pod.onrender.com')).rstrip('/')}/#/track",
         ).rstrip("/")
     )
 

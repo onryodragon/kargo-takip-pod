@@ -7,9 +7,13 @@ ve Teslimat Kanıtı (PoD) Sistemi — FastAPI + Flutter Web Tek Çatı Giriş N
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Annotated, List, Optional
+from urllib.request import Request as UrlRequest, urlopen
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +26,11 @@ from app.core.config import settings
 from app.routers import orders, tenants, tracking
 from app.services.excel_mailer import ExcelPoDMailerService, OrderPoDRecord
 
+logger = logging.getLogger("pod_system.main")
+
+RENDER_KEEP_ALIVE_URL = "https://kargo-takip-pod.onrender.com/api/v1/health"
+RENDER_KEEP_ALIVE_INTERVAL_SECONDS = 600  # 10 dakika
+
 EmailAddress = Annotated[
     str,
     StringConstraints(pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$", strip_whitespace=True),
@@ -31,10 +40,42 @@ EmailAddress = Annotated[
 run_auto_setup()
 
 
+def _ping_render_health_sync() -> None:
+    req = UrlRequest(
+        RENDER_KEEP_ALIVE_URL,
+        headers={"User-Agent": "Render-KeepAlive-Service/1.0"},
+    )
+    with urlopen(req, timeout=15.0) as resp:
+        resp.read()
+
+
+async def _render_keep_alive_loop() -> None:
+    """
+    Render ücretsiz planda sunucunun 15 dakika hareketsizlik sonrası uyku moduna
+    geçmesini önlemek için her 10 dakikada bir `https://kargo-takip-pod.onrender.com/api/v1/health`
+    adresine otomatik istek atar.
+    """
+    while True:
+        await asyncio.sleep(RENDER_KEEP_ALIVE_INTERVAL_SECONDS)
+        try:
+            await asyncio.to_thread(_ping_render_health_sync)
+            logger.info("Render Keep-Alive ping başarılı: %s", RENDER_KEEP_ALIVE_URL)
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.debug("Render Keep-Alive ping uyarısı: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
     run_auto_setup()
-    yield
+    keep_alive_task = asyncio.create_task(_render_keep_alive_loop())
+    try:
+        yield
+    finally:
+        keep_alive_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await keep_alive_task
 
 
 app = FastAPI(
@@ -97,9 +138,12 @@ class TenantArchiveRequest(BaseModel):
 
 
 @app.get("/health", tags=["Sistem Durumu"])
+@app.get("/api/v1/health", tags=["Sistem Durumu"])
 async def health_check():
     return {
         "status": "healthy",
+        "render_url": "https://kargo-takip-pod.onrender.com",
+        "keep_alive_interval_seconds": RENDER_KEEP_ALIVE_INTERVAL_SECONDS,
         "supabase_connected": settings.is_supabase_enabled,
         "storage_mode": "supabase" if settings.is_supabase_enabled else "sqlite (kargo_takip.db)",
         "web_ui_bundled": (settings.STATIC_WEB_DIR / "index.html").exists(),

@@ -6,6 +6,9 @@ import 'package:url_launcher/url_launcher.dart';
 class WhatsAppHelper {
   const WhatsAppHelper._();
 
+  /// Canlı Render Web Takip Adresi
+  static const String baseWebUrl = 'https://kargo-takip-pod.onrender.com';
+
   /// Müşteri telefon numarasını temizler ve Türkiye uluslararası formatına (`905xxxxxxxxx`) dönüştürür.
   ///
   /// Örnekler:
@@ -41,10 +44,11 @@ class WhatsAppHelper {
     required String customerName,
     required String tenantName,
     required String orderNumber,
-    required String baseUrl,
+    String baseUrl = baseWebUrl,
     required String trackingToken,
   }) {
-    final cleanBase = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    final cleanBase = (baseUrl.trim().isEmpty ? baseWebUrl : baseUrl.trim())
+        .replaceAll(RegExp(r'/+$'), '');
     final cleanOrderNo = orderNumber.trim().replaceFirst(RegExp(r'^#+'), '');
     final trackingUrl = '$cleanBase/#/track/${trackingToken.trim()}';
 
@@ -60,7 +64,7 @@ class WhatsAppHelper {
     required String customerName,
     required String tenantName,
     required String orderNumber,
-    required String baseUrl,
+    String baseUrl = baseWebUrl,
     required String trackingToken,
   }) async {
     final normalizedPhone = normalizeTurkishPhone(customerPhone);

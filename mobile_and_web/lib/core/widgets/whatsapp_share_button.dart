@@ -1,7 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../api/api_client.dart';
 import '../utils/whatsapp_helper.dart';
 
 /// Yönetici ve Kurye ekranlarında müşteriye tek tıkla White-Label
@@ -43,10 +41,7 @@ class WhatsAppShareButton extends StatelessWidget {
     if (baseUrlOverride != null && baseUrlOverride!.trim().isNotEmpty) {
       return baseUrlOverride!.trim();
     }
-    if (kIsWeb) {
-      return Uri.base.origin;
-    }
-    return ApiClient.baseUrl;
+    return WhatsAppHelper.baseWebUrl;
   }
 
   Future<void> _handlePress(BuildContext context) async {

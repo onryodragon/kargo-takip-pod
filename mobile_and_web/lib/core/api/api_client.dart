@@ -14,31 +14,23 @@ class ApiClient {
   static const String _prefTenantKey = 'pod_current_tenant';
   static const String _prefBaseUrlKey = 'pod_custom_api_base_url';
 
+  /// Canlı Render Bulut Sunucu Adresleri (4.5G Mobil & Web)
+  static const String defaultApiBaseUrl = 'https://kargo-takip-pod.onrender.com';
+  static const String defaultWsBaseUrl = 'wss://kargo-takip-pod.onrender.com';
+  static const String baseWebUrl = 'https://kargo-takip-pod.onrender.com';
+
   static String? _customBaseUrl;
 
-  /// Render / Bulut veya yerel geliştirme ortamına göre dinamik API adresi:
-  /// - Web'de doğrudan FastAPI içinden (`backend/static_web`) sunulduğunda otomatik olarak
-  ///   bulunduğu domaini (`Uri.base.origin`, örn: `https://...onrender.com`) kullanır.
-  /// - Mobil cihazda 4.5G ile kullanırken kayıtlı Render URL'sini veya `API_BASE_URL` değerini kullanır.
+  /// Varsayılan olarak canlı Render sunucusunu (`https://kargo-takip-pod.onrender.com`) kullanır.
   static String get baseUrl {
     if (_customBaseUrl != null && _customBaseUrl!.trim().isNotEmpty) {
       return _customBaseUrl!.trim().replaceAll(RegExp(r'/+$'), '');
     }
-    const envUrl = String.fromEnvironment('API_BASE_URL', defaultValue: '');
-    if (envUrl.isNotEmpty) {
-      return envUrl.replaceAll(RegExp(r'/+$'), '');
-    }
-    if (kIsWeb) {
-      final origin = Uri.base.origin;
-      // Sadece yerel flutter run -d chrome geliştirme portunda ise 8000'e yönlendir;
-      // Render'da veya port 8000'de kendi origin'ini kullan.
-      if ((origin.contains('localhost:') || origin.contains('127.0.0.1:')) &&
-          !origin.endsWith(':8000')) {
-        return 'http://localhost:8000';
-      }
-      return origin;
-    }
-    return 'http://localhost:8000';
+    const envUrl = String.fromEnvironment(
+      'API_BASE_URL',
+      defaultValue: defaultApiBaseUrl,
+    );
+    return envUrl.replaceAll(RegExp(r'/+$'), '');
   }
 
   static Future<void> setCustomBaseUrl(String url) async {
@@ -411,19 +403,20 @@ class ApiClient {
   }
 
   String buildTrackingWebSocketUrl(String trackingToken) {
-    final wsBase = baseUrl
-        .replaceFirst('https://', 'wss://')
-        .replaceFirst('http://', 'ws://');
-    return '$wsBase/api/v1/tracking/ws/$trackingToken';
+    if (_customBaseUrl != null && _customBaseUrl!.trim().isNotEmpty) {
+      final wsCustom = _customBaseUrl!
+          .trim()
+          .replaceAll(RegExp(r'/+$'), '')
+          .replaceFirst('https://', 'wss://')
+          .replaceFirst('http://', 'ws://');
+      return '$wsCustom/api/v1/tracking/ws/$trackingToken';
+    }
+    return '$defaultWsBaseUrl/api/v1/tracking/ws/$trackingToken';
   }
 
-  /// Yönetici ekranından müşteriye WhatsApp/SMS ile gönderilecek White-Label takip linki
+  /// Yönetici ve Kurye ekranından müşteriye WhatsApp/SMS ile gönderilecek White-Label takip linki
   String buildCustomerShareableTrackingUrl(String trackingToken) {
-    if (kIsWeb) {
-      final origin = Uri.base.origin;
-      return '$origin/#/track/$trackingToken';
-    }
-    return '$baseUrl/#/track/$trackingToken';
+    return '$baseWebUrl/#/track/$trackingToken';
   }
 
   // ---------------------------------------------------------------------------

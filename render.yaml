@@ -6,10 +6,14 @@ services:
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /health
+    healthCheckPath: /api/v1/health
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.7"
+      - key: PUBLIC_BASE_URL
+        value: "https://kargo-takip-pod.onrender.com"
+      - key: PUBLIC_TRACKING_WEB_URL
+        value: "https://kargo-takip-pod.onrender.com/#/track"
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: JWT_ALGORITHM
