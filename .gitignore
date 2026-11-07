@@ -1,0 +1,23 @@
+# Python & FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+backend/.env
+backend/*.db
+backend/*.db-journal
+backend/data/
+
+# Flutter Derleme Çıktıları (mobile_and_web/build hariç tutulur, fakat backend/static_web DAHİL edilir!)
+mobile_and_web/.dart_tool/
+mobile_and_web/.flutter-plugins
+mobile_and_web/.flutter-plugins-dependencies
+mobile_and_web/build/
+.gradle/
+local.properties
+
+# ÖNEMLİ: Render'ın Flutter SDK olmadan doğrudan sunabilmesi için backend/static_web Git'e DAHİLDİR!
+!backend/static_web/
+!backend/static_web/**

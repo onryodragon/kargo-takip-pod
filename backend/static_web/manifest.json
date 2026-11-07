@@ -1,0 +1,11 @@
+{
+    "name": "Teslimat & Canlı Kurye Takip Sistemi",
+    "short_name": "Kargo Takip",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#1E40AF",
+    "theme_color": "#1E40AF",
+    "description": "Multi-Tenant Teslimat, Canlı Kurye Takip ve Teslimat Kanıtı (PoD) Sistemi.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false
+}

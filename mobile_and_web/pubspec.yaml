@@ -1,0 +1,39 @@
+name: kargo_takip_pod
+description: >-
+  Huawei AppGallery (GMS Bağımsız) Çoklu İşletme Destekli (Multi-Tenant) Teslimat,
+  Canlı Kurye Takip, White-Label Müşteri İzleme ve Zorunlu Teslimat Kanıtı (PoD) Sistemi.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 1. Harita (GMS Bağımsız - OpenStreetMap)
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+  # 2. Konum (Huawei Cihazlar için forceLocationManager: true destekli)
+  geolocator: ^13.0.2
+
+  # 3. Zorunlu Teslimat Kanıtı (PoD: Kamera + Ekrana İmza Pedi)
+  image_picker: ^1.1.2
+  signature: ^5.5.0
+
+  # 4. Ağ, WebSocket, Yerel Oturum ve Paylaşım
+  http: ^1.2.2
+  web_socket_channel: ^3.0.1
+  shared_preferences: ^2.3.3
+  url_launcher: ^6.3.1
+  share_plus: ^10.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
