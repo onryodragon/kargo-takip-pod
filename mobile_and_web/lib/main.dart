@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'core/api/api_client.dart';
 import 'core/services/location_service.dart';
 import 'core/theme/tenant_theme.dart';
+import 'core/widgets/animated_saas_widgets.dart';
 import 'features/admin/admin_dashboard_screen.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/auth/driver_invite_register_screen.dart';
@@ -166,34 +167,39 @@ class _MultiTenantDeliveryAppState extends State<MultiTenantDeliveryApp> {
               if (parsed != null) {
                 final trackToken = _extractTrackingTokenFromUri(parsed);
                 if (trackToken != null) {
-                  return MaterialPageRoute(
-                    settings: routeSettings,
-                    builder: (_) => CustomerTrackingScreen(
+                  return createSmoothPageRoute(
+                    CustomerTrackingScreen(
                       apiClient: widget.apiClient,
                       trackingToken: trackToken,
                     ),
+                    settings: routeSettings,
                   );
                 }
 
                 final inviteToken = _extractDriverInviteTokenFromUri(parsed);
                 if (inviteToken != null && !widget.apiClient.isAuthenticated) {
-                  return MaterialPageRoute(
-                    settings: routeSettings,
-                    builder: (_) => DriverInviteRegisterScreen(
+                  return createSmoothPageRoute(
+                    DriverInviteRegisterScreen(
                       apiClient: widget.apiClient,
                       initialInviteToken: inviteToken,
                       onRegistered: _refreshAuthState,
                     ),
+                    settings: routeSettings,
                   );
                 }
               }
             }
-            return MaterialPageRoute(
+            return createSmoothPageRoute(
+              _buildHomeScreen(),
               settings: routeSettings,
-              builder: (_) => _buildHomeScreen(),
             );
           },
-          home: _buildHomeScreen(),
+          home: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 380),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: _buildHomeScreen(),
+          ),
         );
       },
     );

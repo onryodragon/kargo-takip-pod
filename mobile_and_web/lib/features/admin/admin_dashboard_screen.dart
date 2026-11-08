@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:share_plus/share_plus.dart';
@@ -11,6 +12,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../core/api/api_client.dart';
 import '../../core/services/smart_routing_service.dart';
 import '../../core/theme/tenant_theme.dart';
+import '../../core/widgets/animated_saas_widgets.dart';
 import '../../core/widgets/whatsapp_share_button.dart';
 import 'create_order_screen.dart';
 import 'tenant_settings_sheet.dart';
@@ -568,10 +570,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   const SizedBox(height: 8),
                   if (photoUrl != null && photoUrl.isNotEmpty)
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       child: Image.network(
                         photoUrl,
-                        height: 210,
+                        height: 215,
                         width: double.infinity,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
@@ -581,7 +583,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           child: Text('Fotoğraf URL: $photoUrl'),
                         ),
                       ),
-                    ),
+                    )
+                        .animate()
+                        .fadeIn(duration: 380.ms)
+                        .scale(
+                          begin: const Offset(0.92, 0.92),
+                          end: const Offset(1.0, 1.0),
+                          curve: Curves.easeOutBack,
+                        ),
                   const SizedBox(height: 16),
                   const Text(
                     '2. Alıcı İmzası (Ekrana Atılan İmza)',
@@ -592,7 +601,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: const Color(0xFFCBD5E1)),
                       ),
                       padding: const EdgeInsets.all(8),
@@ -607,7 +616,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           child: Text('İmza URL: $signatureUrl'),
                         ),
                       ),
-                    ),
+                    )
+                        .animate()
+                        .fadeIn(delay: 120.ms, duration: 380.ms)
+                        .scale(
+                          begin: const Offset(0.92, 0.92),
+                          end: const Offset(1.0, 1.0),
+                          curve: Curves.easeOutBack,
+                        ),
                 ],
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
@@ -639,8 +655,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     String? initialAddress,
   }) async {
     final created = await Navigator.of(context).push<Map<String, dynamic>>(
-      MaterialPageRoute(
-        builder: (_) => CreateOrderScreen(
+      createSmoothPageRoute(
+        CreateOrderScreen(
           apiClient: widget.apiClient,
           availableDrivers: _drivers,
           initialCenter: initialLatLng ?? const LatLng(40.9923, 29.1244),
@@ -844,53 +860,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       ),
                     MarkerLayer(
                       markers: [
-                        // 0) Aranan Adres Pini (Varsa)
+                        // 0) Aranan Adres Pini (Zıplayan `Curves.elasticOut` Animasyonlu)
                         if (_pinnedSearchAddress != null)
                           Marker(
                             point: _pinnedSearchAddress!.latLng,
-                            width: 140,
-                            height: 72,
-                            child: GestureDetector(
+                            width: 155,
+                            height: 78,
+                            child: BouncingOrderMapPin(
+                              key: ValueKey(
+                                'search-${_pinnedSearchAddress!.latLng.latitude}',
+                              ),
+                              label: 'Seçilen Adres (Sipariş Aç)',
+                              isSelectedAddress: true,
                               onTap: () => _openCreateOrderScreen(
                                 initialLatLng: _pinnedSearchAddress!.latLng,
-                                initialAddress: _pinnedSearchAddress!.displayName,
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFDC2626),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Text(
-                                      'Seçilen Adres (Sipariş Aç)',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  const Icon(
-                                    Icons.add_location_alt_rounded,
-                                    size: 40,
-                                    color: Color(0xFFDC2626),
-                                  ),
-                                ],
+                                initialAddress:
+                                    _pinnedSearchAddress!.displayName,
                               ),
                             ),
                           ),
 
-                        // 1) Sipariş Hedef (Durak Numaralı) ve 24 Saatlik Teslimat Pinleri
+                        // 1) Sipariş Hedef (Zıplayan Durak) ve 24 Saatlik Parlayan Yeşil Teslimat Pinleri
                         ..._mapOrders.map((order) {
                           final isDelivered = order['status'] == 'delivered';
-                          final lat = (order['delivered_lat'] ?? order['dest_lat']) as num;
-                          final lng = (order['delivered_lng'] ?? order['dest_lng']) as num;
+                          final lat = (order['delivered_lat'] ??
+                              order['dest_lat']) as num;
+                          final lng = (order['delivered_lng'] ??
+                              order['dest_lng']) as num;
                           final remText = _formatRemainingVisibility(
                             order['remaining_visibility_minutes'],
                           );
@@ -898,104 +894,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
                           return Marker(
                             point: LatLng(lat.toDouble(), lng.toDouble()),
-                            width: 145,
-                            height: 76,
-                            child: GestureDetector(
+                            width: 155,
+                            height: 80,
+                            child: BouncingOrderMapPin(
+                              key: ValueKey('adm-ord-${order['id']}-${order['status']}'),
+                              label: isDelivered
+                                  ? '✓ #${order['order_number']} ($remText)'
+                                  : (stopLabel != null
+                                      ? '$stopLabel • #${order['order_number']}'
+                                      : '#${order['order_number']}'),
+                              isDelivered: isDelivered,
+                              isFirstStop: order['stop_sequence'] == 1,
                               onTap: () => _openOrderDetailsAndPoDModal(order),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 7,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isDelivered
-                                          ? const Color(0xFF15803D)
-                                          : (stopLabel != null
-                                              ? const Color(0xFF1D4ED8)
-                                              : const Color(0xFFD97706)),
-                                      borderRadius: BorderRadius.circular(8),
-                                      boxShadow: const [
-                                        BoxShadow(color: Colors.black26, blurRadius: 4),
-                                      ],
-                                    ),
-                                    child: Text(
-                                      isDelivered
-                                          ? '✓ #${order['order_number']} ($remText)'
-                                          : (stopLabel != null
-                                              ? '$stopLabel • #${order['order_number']}'
-                                              : '#${order['order_number']}'),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  Icon(
-                                    isDelivered
-                                        ? Icons.check_circle_rounded
-                                        : Icons.location_on_rounded,
-                                    size: 38,
-                                    color: isDelivered
-                                        ? const Color(0xFF16A34A)
-                                        : (stopLabel != null
-                                            ? const Color(0xFF2563EB)
-                                            : const Color(0xFFEA580C)),
-                                  ),
-                                ],
-                              ),
                             ),
                           );
                         }),
 
-                        // 2) Kuryelerin Canlı Konum Pinleri
+                        // 2) Kuryelerin Canlı Konum Pinleri (Radar Dalgalı + 3D Araç Tipi Rozetli)
                         ..._drivers
-                            .where((d) => d['last_lat'] != null && d['last_lng'] != null)
+                            .where(
+                              (d) =>
+                                  d['last_lat'] != null &&
+                                  d['last_lng'] != null,
+                            )
                             .map((driver) {
                           final dLat = (driver['last_lat'] as num).toDouble();
                           final dLng = (driver['last_lng'] as num).toDouble();
                           return Marker(
                             point: LatLng(dLat, dLng),
-                            width: 115,
-                            height: 62,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF1E3A8A),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    '${driver['full_name']} (${driver['vehicle_plate'] ?? ''})',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                const CircleAvatar(
-                                  radius: 16,
-                                  backgroundColor: Color(0xFF2563EB),
-                                  child: Icon(
-                                    Icons.two_wheeler_rounded,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                              ],
+                            width: 145,
+                            height: 82,
+                            child: PulsingRadarVehiclePin(
+                              label:
+                                  '${driver['full_name']} (${driver['vehicle_plate'] ?? ''})',
+                              vehicleType: driver['vehicle_type']?.toString(),
+                              primaryColor: branding.primaryColor,
                             ),
                           );
                         }),
@@ -1022,22 +955,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
           ),
 
-          // ALT LİSTE: DURAK SIRALI SİPARİŞ KARTLARI, MÜŞTERİ LİNK PAYLAŞIMI VE 24s PoD ARŞİVİ
+          // ALT LİSTE: SHIMMER YÜKLEME VEYA STAGGERED ANİMASYONLU SİPARİŞ KARTLARI
           Expanded(
             flex: 4,
-            child: _mapOrders.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text(
-                        'İşletmenizde henüz aktif veya son 24 saatte teslim edilmiş sipariş bulunmuyor.\n'
-                        'Üstten adres arayarak veya sağ alttaki butondan yeni sipariş ve kurye ataması yapabilirsiniz.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Color(0xFF64748B)),
-                      ),
-                    ),
-                  )
-                : ListView.builder(
+            child: _isLoading && _mapOrders.isEmpty
+                ? const ShimmerOrderLoadingList()
+                : _mapOrders.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: const GlassmorphicContainer(
+                            padding: EdgeInsets.all(20),
+                            child: Text(
+                              'İşletmenizde henüz aktif veya son 24 saatte teslim edilmiş sipariş bulunmuyor.\n'
+                              'Üstten adres arayarak veya sağ alttaki butondan yeni sipariş ve kurye ataması yapabilirsiniz.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Color(0xFF64748B)),
+                            ),
+                          ).animate().fadeIn(),
+                        ),
+                      )
+                    : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(12, 10, 12, 80),
                     itemCount: _mapOrders.length,
                     itemBuilder: (context, index) {
@@ -1179,7 +1117,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   ),
                                 ),
                         ),
-                      );
+                      )
+                          .animate()
+                          .fadeIn(
+                            duration: 340.ms,
+                            delay: (index * 55).ms,
+                          )
+                          .slideY(
+                            begin: 0.12,
+                            end: 0,
+                            curve: Curves.easeOutCubic,
+                          );
                     },
                   ),
           ),

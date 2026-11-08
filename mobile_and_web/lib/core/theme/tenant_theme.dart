@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// İşletmeye (Tenant) özel White-Label marka ve raporlama modeli.
 class TenantBranding {
@@ -33,7 +34,8 @@ class TenantBranding {
   factory TenantBranding.fromJson(Map<String, dynamic> json) {
     return TenantBranding(
       id: (json['id'] ?? '').toString(),
-      name: (json['name'] ?? json['tenant_name'] ?? 'Teslimat Sistemi').toString(),
+      name: (json['name'] ?? json['tenant_name'] ?? 'Teslimat Sistemi')
+          .toString(),
       slug: (json['slug'] ?? '').toString(),
       logoUrl: json['logo_url']?.toString(),
       primaryColorHex: (json['primary_color'] ?? '#1E40AF').toString(),
@@ -54,7 +56,10 @@ class TenantBranding {
 
   Color get primaryColor => parseHexColor(primaryColorHex);
 
-  static Color parseHexColor(String hexString, {Color fallback = const Color(0xFF1E40AF)}) {
+  static Color parseHexColor(
+    String hexString, {
+    Color fallback = const Color(0xFF1E40AF),
+  }) {
     final cleaned = hexString.trim().replaceAll('#', '');
     if (cleaned.length == 6) {
       final val = int.tryParse('FF$cleaned', radix: 16);
@@ -98,17 +103,29 @@ class TenantThemeController extends ChangeNotifier {
       brightness: Brightness.light,
     );
 
+    final baseTextTheme = GoogleFonts.poppinsTextTheme();
+
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+      textTheme: baseTextTheme,
+      scaffoldBackgroundColor: const Color(0xFFF1F5F9),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: ZoomPageTransitionsBuilder(),
+          TargetPlatform.iOS: ZoomPageTransitionsBuilder(),
+          TargetPlatform.windows: ZoomPageTransitionsBuilder(),
+          TargetPlatform.macOS: ZoomPageTransitionsBuilder(),
+          TargetPlatform.linux: ZoomPageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: seed,
         foregroundColor: Colors.white,
-        elevation: 2,
+        elevation: 0,
         centerTitle: false,
-        titleTextStyle: const TextStyle(
-          fontSize: 18,
+        titleTextStyle: GoogleFonts.poppins(
+          fontSize: 17.5,
           fontWeight: FontWeight.w700,
           color: Colors.white,
         ),
@@ -119,22 +136,32 @@ class TenantThemeController extends ChangeNotifier {
           foregroundColor: Colors.white,
           disabledBackgroundColor: const Color(0xFFCBD5E1),
           disabledForegroundColor: const Color(0xFF64748B),
+          elevation: 3,
+          shadowColor: seed.withValues(alpha: 0.35),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: GoogleFonts.poppins(
+            fontSize: 14.5,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
       cardTheme: CardThemeData(
         color: Colors.white,
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        elevation: 3,
+        shadowColor: const Color(0xFF0F172A).withValues(alpha: 0.08),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
       ),
     );
   }
 }
 
 /// Yönetici, Kurye ve Müşteri Geçici Takip ekranlarının üst kısmında
-/// işletmenin kendi logosunu ve adını gösteren White-Label AppBar bileşeni.
+/// işletmenin kendi logosunu ve adını modern SaaS gradyanıyla gösteren White-Label AppBar bileşeni.
 class WhiteLabelAppBar extends StatelessWidget implements PreferredSizeWidget {
   final TenantBranding branding;
   final String? subtitle;
@@ -148,14 +175,31 @@ class WhiteLabelAppBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(62);
+  Size get preferredSize => const Size.fromHeight(64);
 
   @override
   Widget build(BuildContext context) {
-    final hasLogo = branding.logoUrl != null && branding.logoUrl!.trim().isNotEmpty;
+    final hasLogo =
+        branding.logoUrl != null && branding.logoUrl!.trim().isNotEmpty;
+    final darkShade = Color.lerp(branding.primaryColor, Colors.black, 0.28)!;
+    final accentShade =
+        Color.lerp(branding.primaryColor, const Color(0xFF4F46E5), 0.35)!;
 
     return AppBar(
-      backgroundColor: branding.primaryColor,
+      flexibleSpace: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              darkShade,
+              branding.primaryColor,
+              accentShade,
+            ],
+          ),
+        ),
+      ),
+      backgroundColor: Colors.transparent,
       foregroundColor: Colors.white,
       title: Row(
         children: [
@@ -163,11 +207,11 @@ class WhiteLabelAppBar extends StatelessWidget implements PreferredSizeWidget {
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 child: Image.network(
                   branding.logoUrl!,
-                  width: 38,
-                  height: 38,
+                  width: 40,
+                  height: 40,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => _buildFallbackAvatar(),
                 ),
@@ -188,9 +232,10 @@ class WhiteLabelAppBar extends StatelessWidget implements PreferredSizeWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w800,
                     color: Colors.white,
+                    letterSpacing: 0.2,
                   ),
                 ),
                 if (subtitle != null && subtitle!.isNotEmpty)
@@ -199,9 +244,9 @@ class WhiteLabelAppBar extends StatelessWidget implements PreferredSizeWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 11.5,
                       color: Colors.white70,
-                      fontWeight: FontWeight.w400,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
               ],
@@ -218,19 +263,26 @@ class WhiteLabelAppBar extends StatelessWidget implements PreferredSizeWidget {
         ? branding.name.trim().substring(0, 1).toUpperCase()
         : 'T';
     return Container(
-      width: 38,
-      height: 38,
+      width: 40,
+      height: 40,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white38),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.28),
+            Colors.white.withValues(alpha: 0.12),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: Colors.white38, width: 1.2),
       ),
       child: Text(
         initial,
         style: const TextStyle(
           color: Colors.white,
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w900,
           fontSize: 18,
         ),
       ),

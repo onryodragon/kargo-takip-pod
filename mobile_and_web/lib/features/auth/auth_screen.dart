@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/widgets/animated_saas_widgets.dart';
 import 'driver_invite_register_screen.dart';
 import 'forgot_password_screen.dart';
 import 'google_auth_sheet.dart';
@@ -166,8 +168,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _openForgotPassword() async {
     final resetEmail = await Navigator.of(context).push<String>(
-      MaterialPageRoute(
-        builder: (_) => ForgotPasswordScreen(
+      createSmoothPageRoute(
+        ForgotPasswordScreen(
           apiClient: widget.apiClient,
           initialEmail: _loginEmailCtrl.text.trim(),
         ),
@@ -183,13 +185,15 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _openDriverInviteScreen() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (ctx) => DriverInviteRegisterScreen(
-          apiClient: widget.apiClient,
-          onRegistered: () {
-            Navigator.of(ctx).pop();
-            widget.onAuthenticated();
-          },
+      createSmoothPageRoute(
+        Builder(
+          builder: (ctx) => DriverInviteRegisterScreen(
+            apiClient: widget.apiClient,
+            onRegistered: () {
+              Navigator.of(ctx).pop();
+              widget.onAuthenticated();
+            },
+          ),
         ),
       ),
     );
@@ -201,21 +205,59 @@ class _AuthScreenState extends State<AuthScreen> {
     final currentAdminEmail = _adminEmailCtrl.text.trim();
 
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 470),
-            child: Card(
-              elevation: 4,
-              child: Padding(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF0F172A),
+              primary,
+              const Color(0xFF312E81),
+            ],
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: GlassmorphicContainer(
                 padding: const EdgeInsets.all(28),
+                borderRadius: 24,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(Icons.local_shipping_rounded, size: 52, color: primary),
-                    const SizedBox(height: 12),
+                    Container(
+                      width: 68,
+                      height: 68,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [
+                            primary,
+                            const Color(0xFF4F46E5),
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: primary.withValues(alpha: 0.35),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.local_shipping_rounded,
+                        size: 36,
+                        color: Colors.white,
+                      ),
+                    )
+                        .animate(onPlay: (c) => c.repeat(reverse: true))
+                        .scaleXY(begin: 0.95, end: 1.05, duration: 1200.ms),
+                    const SizedBox(height: 14),
                     Text(
                       _isRegisterMode
                           ? 'Yeni İşletme Kaydı (Multi-Tenant)'
@@ -503,7 +545,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                   ],
                 ),
-              ),
+              ).animate().fadeIn(duration: 420.ms).slideY(begin: 0.06, end: 0),
             ),
           ),
         ),
