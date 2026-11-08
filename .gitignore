@@ -17,6 +17,8 @@ mobile_and_web/.flutter-plugins-dependencies
 mobile_and_web/build/
 .gradle/
 local.properties
+*.apk
+.idea/
 
 # ÖNEMLİ: Render'ın Flutter SDK olmadan doğrudan sunabilmesi için backend/static_web Git'e DAHİLDİR!
 !backend/static_web/
