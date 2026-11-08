@@ -9,29 +9,19 @@ Görevleri:
    klasörlerini hazırlar.
 3. Supabase bağlantı bilgileri girilmişse `database/schema.sql` şemasını ve `pod-media`
    public bucket'ını Python üzerinden otomatik oluşturur; girilmemişse yerel SQLite
-   (`backend/kargo_takip.db`) veritabanını hazırlar.
-4. Veritabanı boşsa test için varsayılan:
-   - 1 İşletme (`Yıldız Ekspres Kargo`)
-   - 1 Yönetici (`admin@demo.com` / `123456`)
-   - 1 Kurye (`kurye@demo.com` / `123456`)
-   - 2 Örnek Sipariş (1 Aktif Dağıtımda + 1 Son 24 Saat İçinde Teslim Edilmiş, Fotoğraflı/İmzalı ve Excel Arşivli)
-   verilerini (Seed Data) otomatik ekler.
+   (`backend/kargo_takip.db`) veritabanı tablolarını hazırlar.
+4. Geçmişten kalan demo/test verilerini (`admin@demo.com`, `kurye@demo.com`, örnek siparişler)
+   otomatik olarak temizler. Hazır test hesabı oluşturmaz; her işletme kendi e-postası ile
+   tamamen izole (`tenant_id`) çalışma alanı kurar.
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+import shutil
 
 from app.core.config import BASE_DIR, ENV_FILE_PATH, settings
 from app.core.database import db
-from app.services.excel_mailer import (
-    ExcelPoDMailerService,
-    OrderPoDRecord,
-    _create_sample_photo_bytes,
-    _create_sample_signature_bytes,
-)
 
 logger = logging.getLogger("pod_system.auto_setup")
 
@@ -41,8 +31,8 @@ JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=10080
 
 # Sunucu ve Müşteri Geçici Takip Linki Baz URL'leri
-PUBLIC_BASE_URL=http://localhost:8000
-PUBLIC_TRACKING_WEB_URL=http://localhost:8000/#/track
+PUBLIC_BASE_URL=https://kargo-takip-pod.onrender.com
+PUBLIC_TRACKING_WEB_URL=https://kargo-takip-pod.onrender.com/#/track
 
 # Supabase Bağlantısı (Boş bırakıldığında yerel SQLite kargo_takip.db otomatik çalışır)
 SUPABASE_URL=
@@ -125,148 +115,30 @@ def auto_configure_supabase_if_enabled() -> None:
             logger.warning("Supabase schema.sql otomatik uygulama uyarısı: %s", exc)
 
 
-def seed_initial_demo_data() -> None:
+def cleanup_legacy_demo_data() -> None:
     """
-    Veritabanı boşsa varsayılan 1 İşletme, 1 Yönetici (admin@demo.com / 123456),
-    1 Kurye (kurye@demo.com / 123456) ve 2 Örnek Siparişi otomatik ekler.
+    Veritabanı şemasını hazırlar ve geçmişten kalan tüm demo/seed kayıtlarını
+    (`admin@demo.com`, `kurye@demo.com`, örnek işletme ve örnek siparişleri) temizler.
     """
     db.init_sqlite_schema()
-    if db.count_tenants() > 0:
-        return
+    purged_tenant_ids = db.purge_demo_data()
 
-    logger.info("Veritabanı boş — Varsayılan Demo İşletme, Yönetici, Kurye ve 2 Sipariş ekleniyor...")
+    # Demo medya ve demo Excel dosyalarını temizle
+    for t_id in purged_tenant_ids:
+        demo_media_dir = settings.POD_MEDIA_DIR / t_id
+        if demo_media_dir.exists():
+            shutil.rmtree(demo_media_dir, ignore_errors=True)
 
-    # 1. Varsayılan İşletme (Tenant) + Yönetici (admin@demo.com / 123456)
-    tenant, admin_user = db.register_tenant_and_admin(
-        name="Yıldız Ekspres Kargo",
-        slug="yildiz-ekspres",
-        report_email="arsiv@demo.com",
-        logo_url=None,
-        primary_color="#1E40AF",
-        phone="+90 216 555 00 00",
-        admin_full_name="Olkan Yönetici (Demo Admin)",
-        admin_email="admin@demo.com",
-        admin_phone="+90 532 100 20 30",
-        admin_password="123456",
-    )
-
-    # 2. Varsayılan Kurye (kurye@demo.com / 123456)
-    driver_user = db.create_driver(
-        tenant_id=tenant["id"],
-        full_name="Mehmet Demir (Saha Kuryesi)",
-        email="kurye@demo.com",
-        phone="+90 533 200 30 40",
-        password="123456",
-        vehicle_plate="34 KRG 2026",
-        vehicle_type="Motosiklet",
-    )
-
-    # Kuryenin başlangıç canlı konumunu kaydet (Ataşehir / İstanbul)
-    db.record_driver_location(
-        tenant_id=tenant["id"],
-        driver_id=driver_user["id"],
-        lat=40.990500,
-        lng=29.121500,
-        speed=34.0,
-        heading=115.0,
-        accuracy=4.5,
-        battery_level=92,
-    )
-
-    # 3. Örnek Sipariş #1: Aktif Dağıtımda (Kuryeye Atanmış + Canlı Takip Linki Aktif)
-    active_order = db.create_order(
-        tenant_id=tenant["id"],
-        created_by=admin_user["id"],
-        order_number="SIP-2026-1001",
-        customer_name="Ayşe Kaya",
-        customer_phone="0532 111 22 33",
-        delivery_address="Atatürk Mah. Ertuğrul Gazi Sok. No: 14 Kat: 3 Ataşehir / İstanbul",
-        delivery_notes="Güvenliğe bırakmayın, zili çalın.",
-        dest_lat=40.992310,
-        dest_lng=29.124420,
-        assigned_driver_id=driver_user["id"],
-        tracking_token_override="demo-canli-takip-token-2026",
-        status_override="in_transit",
-    )
-
-    # 4. Örnek Sipariş #2: Son 24 Saat İçinde Teslim Edilmiş (Yeşil Pin + Fotoğraf + İmza + Excel Arşivi)
-    delivered_order = db.create_order(
-        tenant_id=tenant["id"],
-        created_by=admin_user["id"],
-        order_number="SIP-2026-1002",
-        customer_name="Burak Özdemir",
-        customer_phone="0533 444 55 66",
-        delivery_address="Barbaros Mah. Mor Sümbül Sok. No: 7 Batı Ataşehir / İstanbul",
-        delivery_notes="Resepsiyona teslim edilebilir.",
-        dest_lat=40.986500,
-        dest_lng=29.112800,
-        assigned_driver_id=driver_user["id"],
-    )
-
-    # Örnek teslimat fotoğrafı ve müşteri imzasını `uploads/pod-media/` içine oluştur
-    photo_bytes = _create_sample_photo_bytes()
-    sig_bytes = _create_sample_signature_bytes()
-
-    order_media_dir = settings.POD_MEDIA_DIR / tenant["id"] / "SIP-2026-1002"
-    order_media_dir.mkdir(parents=True, exist_ok=True)
-    photo_file = order_media_dir / "photo_seed.png"
-    sig_file = order_media_dir / "signature_seed.png"
-    photo_file.write_bytes(photo_bytes)
-    sig_file.write_bytes(sig_bytes)
-
-    photo_url = f"{settings.PUBLIC_BASE_URL}/uploads/pod-media/{tenant['id']}/SIP-2026-1002/photo_seed.png"
-    sig_url = f"{settings.PUBLIC_BASE_URL}/uploads/pod-media/{tenant['id']}/SIP-2026-1002/signature_seed.png"
-
-    delivered_time_dt = datetime.now(timezone.utc) - timedelta(minutes=45)
-    completed = db.complete_order_delivery(
-        tenant_id=tenant["id"],
-        order_id=delivered_order["id"],
-        actor_user_id=driver_user["id"],
-        actor_role="driver",
-        pod_photo_url=photo_url,
-        pod_signature_url=sig_url,
-        recipient_name="Burak Özdemir (Kendisi)",
-        delivered_lat=40.986520,
-        delivered_lng=29.112815,
-        delivered_at_override=delivered_time_dt.isoformat(),
-    )
-
-    # Örnek Sipariş #2 için fotoğraflı ve imzalı Excel dosyasını `backend/excel_arsiv/` klasörüne kaydet
-    mailer = ExcelPoDMailerService()
-    mailer.send_pod_excel_email(
-        tenant_name=tenant["name"],
-        report_email=tenant["report_email"],
-        orders=[
-            OrderPoDRecord(
-                order_number=completed["order_number"],
-                customer_name=completed["customer_name"],
-                customer_phone=completed["customer_phone"],
-                delivery_address=completed["delivery_address"],
-                driver_name=driver_user["full_name"],
-                driver_plate=driver_user["vehicle_plate"],
-                recipient_name="Burak Özdemir (Kendisi)",
-                delivered_at=delivered_time_dt,
-                dest_lat=completed["dest_lat"],
-                dest_lng=completed["dest_lng"],
-                delivered_lat=40.986520,
-                delivered_lng=29.112815,
-                pod_photo=photo_bytes,
-                pod_signature=sig_bytes,
-            )
-        ],
-        primary_color_hex=tenant["primary_color"],
-    )
-    db.mark_order_email_archived(tenant_id=tenant["id"], order_id=delivered_order["id"])
-
-    logger.info(
-        "Otomatik Seed tamamlandı! Admin: admin@demo.com / 123456 | Kurye: kurye@demo.com / 123456 | "
-        "Aktif Takip Token: %s",
-        active_order["tracking_token"],
-    )
+    if settings.EXCEL_ARCHIVE_DIR.exists():
+        for xlsx_file in settings.EXCEL_ARCHIVE_DIR.glob("*Yildiz_Ekspres*"):
+            try:
+                xlsx_file.unlink()
+            except Exception:
+                pass
 
 
 def run_auto_setup() -> None:
     """Uygulama ayağa kalkarken tüm sıfır-manuel kurulum adımlarını sırasıyla çalıştırır."""
     ensure_env_and_directories()
     auto_configure_supabase_if_enabled()
-    seed_initial_demo_data()
+    cleanup_legacy_demo_data()

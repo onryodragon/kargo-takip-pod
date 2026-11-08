@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/api_client.dart';
 
-/// Yönetici / Kurye Giriş ve Yeni İşletme (Multi-Tenant White-Label) Kayıt Ekranı.
+/// Yönetici / Kurye Giriş ve E-posta Merkezli Tam İzolasyonlu
+/// Yeni İşletme (Multi-Tenant White-Label) Kayıt Ekranı.
 class AuthScreen extends StatefulWidget {
   final ApiClient apiClient;
   final VoidCallback onAuthenticated;
@@ -38,6 +39,15 @@ class _AuthScreenState extends State<AuthScreen> {
   final _adminPasswordCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // Yönetici e-postası yazıldıkça Excel rapor e-postası boşsa otomatik senkronize bilgi göster
+    _adminEmailCtrl.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   void dispose() {
     _loginEmailCtrl.dispose();
     _loginPasswordCtrl.dispose();
@@ -61,27 +71,52 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       if (_isRegisterMode) {
+        final companyName = _tenantNameCtrl.text.trim();
+        final adminName = _adminNameCtrl.text.trim();
+        final adminEmail = _adminEmailCtrl.text.trim().toLowerCase();
+        final adminPhone = _adminPhoneCtrl.text.trim();
+        final adminPassword = _adminPasswordCtrl.text;
+
+        if (companyName.isEmpty ||
+            adminName.isEmpty ||
+            adminEmail.isEmpty ||
+            adminPhone.isEmpty ||
+            adminPassword.length < 6) {
+          throw Exception(
+            'Lütfen işletme adını, yönetici bilgilerini, e-posta adresini ve en az 6 karakterli şifrenizi girin.',
+          );
+        }
+
+        final effectiveReportEmail = _reportEmailCtrl.text.trim().isNotEmpty
+            ? _reportEmailCtrl.text.trim().toLowerCase()
+            : adminEmail;
+
         await widget.apiClient.registerTenant(
-          name: _tenantNameCtrl.text.trim(),
+          name: companyName,
           slug: _tenantSlugCtrl.text.trim().toLowerCase(),
-          reportEmail: _reportEmailCtrl.text.trim(),
+          reportEmail: effectiveReportEmail,
           logoUrl: _logoUrlCtrl.text.trim(),
           primaryColor: _primaryColorCtrl.text.trim(),
-          adminFullName: _adminNameCtrl.text.trim(),
-          adminEmail: _adminEmailCtrl.text.trim(),
-          adminPhone: _adminPhoneCtrl.text.trim(),
-          adminPassword: _adminPasswordCtrl.text,
+          adminFullName: adminName,
+          adminEmail: adminEmail,
+          adminPhone: adminPhone,
+          adminPassword: adminPassword,
         );
       } else {
+        final email = _loginEmailCtrl.text.trim().toLowerCase();
+        final password = _loginPasswordCtrl.text;
+        if (email.isEmpty || password.isEmpty) {
+          throw Exception('Lütfen e-posta adresinizi ve şifrenizi girin.');
+        }
         await widget.apiClient.login(
-          email: _loginEmailCtrl.text.trim(),
-          password: _loginPasswordCtrl.text,
+          email: email,
+          password: password,
         );
       }
       widget.onAuthenticated();
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
       });
     } finally {
       if (mounted) {
@@ -95,13 +130,14 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
+    final currentAdminEmail = _adminEmailCtrl.text.trim();
 
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
+            constraints: const BoxConstraints(maxWidth: 470),
             child: Card(
               elevation: 4,
               child: Padding(
@@ -114,7 +150,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SizedBox(height: 12),
                     Text(
                       _isRegisterMode
-                          ? 'Yeni İşletme (White-Label) Kaydı'
+                          ? 'Yeni İşletme Kaydı (Multi-Tenant)'
                           : 'Teslimat & PoD Yönetim Girişi',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
@@ -125,10 +161,35 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SizedBox(height: 6),
                     Text(
                       _isRegisterMode
-                          ? 'İşletme adınızı, logonuzu ve fotoğraflı Excel arşivlerinin gideceği e-posta adresini belirleyin.'
+                          ? 'E-posta adresinizle işletmenize özel %100 izole çalışma alanınızı oluşturun. Fotoğraflı Excel arşivleri otomatik olarak e-postanıza gönderilir.'
                           : 'İşletme Yöneticisi (Admin) veya Saha Kuryesi (Driver) hesabınızla giriş yapın.',
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 18),
+                    // Giriş / Yeni İşletme Kaydı Sekme Butonları
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment<bool>(
+                          value: false,
+                          icon: Icon(Icons.login_rounded, size: 18),
+                          label: Text('Giriş Yap'),
+                        ),
+                        ButtonSegment<bool>(
+                          value: true,
+                          icon: Icon(Icons.add_business_rounded, size: 18),
+                          label: Text('Yeni İşletme Kaydı'),
+                        ),
+                      ],
+                      selected: {_isRegisterMode},
+                      onSelectionChanged: _isLoading
+                          ? null
+                          : (selection) {
+                              setState(() {
+                                _isRegisterMode = selection.first;
+                                _errorMessage = null;
+                              });
+                            },
                     ),
                     const SizedBox(height: 20),
                     if (_errorMessage != null)
@@ -150,7 +211,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         controller: _loginEmailCtrl,
                         keyboardType: TextInputType.emailAddress,
                         decoration: const InputDecoration(
-                          labelText: 'E-posta Adresi',
+                          labelText: 'İşletme veya Kurye E-posta Adresi',
                           prefixIcon: Icon(Icons.email_outlined),
                           border: OutlineInputBorder(),
                         ),
@@ -159,72 +220,86 @@ class _AuthScreenState extends State<AuthScreen> {
                       TextField(
                         controller: _loginPasswordCtrl,
                         obscureText: true,
+                        onSubmitted: (_) => _submit(),
                         decoration: const InputDecoration(
                           labelText: 'Şifre',
                           prefixIcon: Icon(Icons.lock_outline),
                           border: OutlineInputBorder(),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
-                        children: [
-                          ActionChip(
-                            avatar: const Icon(Icons.admin_panel_settings_outlined, size: 16),
-                            label: const Text('Demo Yönetici (admin@demo.com)', style: TextStyle(fontSize: 12)),
-                            onPressed: () {
-                              setState(() {
-                                _loginEmailCtrl.text = 'admin@demo.com';
-                                _loginPasswordCtrl.text = '123456';
-                              });
-                            },
-                          ),
-                          ActionChip(
-                            avatar: const Icon(Icons.two_wheeler_rounded, size: 16),
-                            label: const Text('Demo Kurye (kurye@demo.com)', style: TextStyle(fontSize: 12)),
-                            onPressed: () {
-                              setState(() {
-                                _loginEmailCtrl.text = 'kurye@demo.com';
-                                _loginPasswordCtrl.text = '123456';
-                              });
-                            },
-                          ),
-                        ],
-                      ),
                     ] else ...[
                       const Text(
-                        '1. İşletme & White-Label Ayarları',
+                        '1. İşletme & Yönetici Hesap Bilgileri',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: _tenantNameCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'İşletme Adı (Örn: Yıldız Ekspres Kargo) *',
+                          labelText: 'İşletme / Şirket Adı *',
+                          hintText: 'Örn: Kuzey Dağıtım Lojistik',
                           prefixIcon: Icon(Icons.storefront_outlined),
                           border: OutlineInputBorder(),
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
-                        controller: _tenantSlugCtrl,
+                        controller: _adminNameCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'İşletme Kısa Kodu / Slug (Örn: yildiz-kargo) *',
-                          prefixIcon: Icon(Icons.link),
+                          labelText: 'İşletme Sahibi / Yönetici Adı Soyadı *',
+                          prefixIcon: Icon(Icons.person_outline),
                           border: OutlineInputBorder(),
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
-                        controller: _reportEmailCtrl,
+                        controller: _adminEmailCtrl,
                         keyboardType: TextInputType.emailAddress,
                         decoration: const InputDecoration(
-                          labelText: 'Fotoğraflı Excel Rapor E-posta Adresi *',
-                          helperText: 'Tamamlanan teslimatların gömülü Excel arşivi bu adrese gönderilir.',
-                          prefixIcon: Icon(Icons.table_view_outlined),
+                          labelText: 'İşletme E-posta Adresi (Giriş & Excel Arşivi) *',
+                          helperText:
+                              'Bu e-posta işletmenizin özel çalışma alanını ve rapor adresini oluşturur.',
+                          prefixIcon: Icon(Icons.alternate_email),
                           border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _adminPhoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'Yönetici Telefon Numarası *',
+                          hintText: '05xx xxx xx xx',
+                          prefixIcon: Icon(Icons.phone_outlined),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _adminPasswordCtrl,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Yönetici Şifresi (En az 6 karakter) *',
+                          prefixIcon: Icon(Icons.lock_outline),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const Divider(height: 28),
+                      const Text(
+                        '2. Opsiyonel White-Label & Rapor Ayarları',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _reportEmailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: InputDecoration(
+                          labelText: 'Farklı Excel Rapor E-postası (Opsiyonel)',
+                          hintText: currentAdminEmail.isNotEmpty
+                              ? 'Varsayılan: $currentAdminEmail'
+                              : 'Boş bırakılırsa giriş e-postanız kullanılır',
+                          prefixIcon: const Icon(Icons.table_view_outlined),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -246,56 +321,12 @@ class _AuthScreenState extends State<AuthScreen> {
                             child: TextField(
                               controller: _primaryColorCtrl,
                               decoration: const InputDecoration(
-                                labelText: 'Renk (HEX)',
+                                labelText: 'Tema HEX',
                                 border: OutlineInputBorder(),
                               ),
                             ),
                           ),
                         ],
-                      ),
-                      const Divider(height: 28),
-                      const Text(
-                        '2. İşletme Sahibi (Admin) Hesabı',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _adminNameCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Yönetici Adı Soyadı *',
-                          prefixIcon: Icon(Icons.person_outline),
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _adminEmailCtrl,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Yönetici Giriş E-postası *',
-                          prefixIcon: Icon(Icons.alternate_email),
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _adminPhoneCtrl,
-                        keyboardType: TextInputType.phone,
-                        decoration: const InputDecoration(
-                          labelText: 'Yönetici Telefonu *',
-                          prefixIcon: Icon(Icons.phone_outlined),
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _adminPasswordCtrl,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Yönetici Şifresi (En az 6 karakter) *',
-                          prefixIcon: Icon(Icons.lock_outline),
-                          border: OutlineInputBorder(),
-                        ),
                       ),
                     ],
                     const SizedBox(height: 22),
@@ -310,9 +341,13 @@ class _AuthScreenState extends State<AuthScreen> {
                                 color: Colors.white,
                               ),
                             )
-                          : Text(_isRegisterMode ? 'İŞLETMEYİ OLUŞTUR VE BAŞLA' : 'GİRİŞ YAP'),
+                          : Text(
+                              _isRegisterMode
+                                  ? 'İŞLETMEYİ OLUŞTUR VE YÖNETİM PANELİNİ AÇ'
+                                  : 'GİRİŞ YAP',
+                            ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     TextButton(
                       onPressed: _isLoading
                           ? null
@@ -324,8 +359,8 @@ class _AuthScreenState extends State<AuthScreen> {
                             },
                       child: Text(
                         _isRegisterMode
-                            ? 'Zaten hesabınız var mı? Giriş Yapın'
-                            : 'Yeni bir işletme misiniz? White-Label İşletme Kaydı Oluşturun',
+                            ? 'Zaten işletme veya kurye hesabınız var mı? Giriş Yapın'
+                            : 'Yeni bir şirket misiniz? Yeni İşletme Kaydı Oluşturun',
                       ),
                     ),
                   ],

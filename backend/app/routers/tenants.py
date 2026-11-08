@@ -36,16 +36,20 @@ router = APIRouter(prefix="/api/v1/tenants", tags=["1. İşletme (White-Label) &
 # ŞEMALAR (PYDANTIC MODELLERİ)
 # ============================================================================
 class TenantRegisterRequest(BaseModel):
-    name: str = Field(..., min_length=2, max_length=150, examples=["Yıldız Ekspres Kargo"])
-    slug: str = Field(..., min_length=2, max_length=100, examples=["yildiz-ekspres"])
-    report_email: EmailAddress = Field(..., examples=["arsiv@yildizekspres.com"])
+    name: str = Field(..., min_length=2, max_length=150, examples=["Kuzey Lojistik"])
+    slug: Optional[str] = Field(None, max_length=100, examples=["kuzey-lojistik"])
+    report_email: Optional[EmailAddress] = Field(
+        None,
+        description="Boş bırakılırsa otomatik olarak yönetici e-postası (admin_email) atanır.",
+        examples=["info@kuzeylojistik.com"],
+    )
     logo_url: Optional[str] = Field(None, examples=["https://cdn.ornek.com/logo.png"])
     primary_color: str = Field("#1E40AF", examples=["#1E40AF"])
     phone: Optional[str] = Field(None, examples=["+90 216 000 00 00"])
 
     # İlk İşletme Sahibi (Admin) Bilgileri
     admin_full_name: str = Field(..., min_length=2, max_length=120, examples=["Olkan Yılmaz"])
-    admin_email: EmailAddress = Field(..., examples=["admin@yildizekspres.com"])
+    admin_email: EmailAddress = Field(..., examples=["info@kuzeylojistik.com"])
     admin_phone: str = Field(..., examples=["+90 532 111 22 33"])
     admin_password: str = Field(..., min_length=6, examples=["GucluSifre2026!"])
 
@@ -85,10 +89,15 @@ async def register_tenant(payload: TenantRegisterRequest):
     Yeni bir işletme (`tenants`) ve işletme sahibini (`users` role='admin')
     tek işlemde (transaction) oluşturur ve doğrudan JWT `access_token` döner.
     """
+    effective_report_email = (
+        str(payload.report_email).strip().lower()
+        if payload.report_email
+        else str(payload.admin_email).strip().lower()
+    )
     tenant, admin_user = db.register_tenant_and_admin(
         name=payload.name,
         slug=payload.slug,
-        report_email=str(payload.report_email),
+        report_email=effective_report_email,
         logo_url=payload.logo_url,
         primary_color=payload.primary_color,
         phone=payload.phone,

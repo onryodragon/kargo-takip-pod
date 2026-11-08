@@ -15,6 +15,7 @@ database.py
 from __future__ import annotations
 
 import logging
+import re
 import secrets
 import sqlite3
 import threading
@@ -26,6 +27,7 @@ from fastapi import HTTPException, status
 
 from app.core.config import settings
 from app.core.security import hash_password, verify_password
+from app.services.routing_service import optimize_orders_nearest_neighbor
 
 logger = logging.getLogger("pod_system.database")
 
@@ -232,6 +234,86 @@ class MultiTenantRepository:
             row = conn.execute("SELECT COUNT(*) AS cnt FROM tenants").fetchone()
             return int(row["cnt"]) if row else 0
 
+    def purge_demo_data(self) -> List[str]:
+        """
+        Geçmişten kalan tüm demo/seed kayıtlarını (`admin@demo.com`, `kurye@demo.com`,
+        `arsiv@demo.com`, `yildiz-ekspres`, `demo-canli-takip-token-2026`) veritabanından siler.
+        Silinen `tenant_id` listesini döner.
+        """
+        purged_tenant_ids: List[str] = []
+        demo_emails = ("admin@demo.com", "kurye@demo.com", "arsiv@demo.com")
+
+        if self._supabase:
+            try:
+                t_res = (
+                    self._supabase.table("tenants")
+                    .select("id")
+                    .or_("slug.eq.yildiz-ekspres,report_email.eq.arsiv@demo.com")
+                    .execute()
+                )
+                for row in t_res.data or []:
+                    tid = row["id"]
+                    purged_tenant_ids.append(tid)
+                    self._supabase.table("tenants").delete().eq("id", tid).execute()
+                for em in demo_emails:
+                    self._supabase.table("users").delete().eq("email", em).execute()
+            except Exception as exc:
+                logger.debug("Supabase demo temizleme uyarısı: %s", exc)
+
+        with self._lock, self._get_sqlite_conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT DISTINCT id FROM tenants
+                WHERE slug = 'yildiz-ekspres'
+                   OR report_email = 'arsiv@demo.com'
+                   OR id IN (
+                       SELECT tenant_id FROM users
+                       WHERE email IN ('admin@demo.com', 'kurye@demo.com')
+                          OR email LIKE '%@demo.com'
+                   )
+                """
+            ).fetchall()
+            for r in rows:
+                purged_tenant_ids.append(str(r["id"]))
+
+            if purged_tenant_ids:
+                placeholders = ",".join("?" for _ in purged_tenant_ids)
+                conn.execute(
+                    f"DELETE FROM location_logs WHERE tenant_id IN ({placeholders})",
+                    purged_tenant_ids,
+                )
+                conn.execute(
+                    f"DELETE FROM orders WHERE tenant_id IN ({placeholders})",
+                    purged_tenant_ids,
+                )
+                conn.execute(
+                    f"DELETE FROM users WHERE tenant_id IN ({placeholders})",
+                    purged_tenant_ids,
+                )
+                conn.execute(
+                    f"DELETE FROM tenants WHERE id IN ({placeholders})",
+                    purged_tenant_ids,
+                )
+            conn.execute(
+                "DELETE FROM orders WHERE tracking_token = 'demo-canli-takip-token-2026'"
+            )
+            conn.execute(
+                "DELETE FROM users WHERE email IN ('admin@demo.com', 'kurye@demo.com') OR email LIKE '%@demo.com'"
+            )
+            conn.commit()
+
+        if purged_tenant_ids:
+            logger.info("Demo/test verileri temizlendi (silinen tenant sayısı: %d)", len(purged_tenant_ids))
+        return purged_tenant_ids
+
+    @staticmethod
+    def _build_slug(raw_slug: Optional[str], company_name: str) -> str:
+        source = (raw_slug or "").strip() or company_name.strip()
+        tr_map = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
+        normalized = source.translate(tr_map).lower()
+        slug_val = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-")
+        return slug_val or f"isletme-{secrets.token_hex(3)}"
+
     # -------------------------------------------------------------------------
     # 1. İŞLETME (TENANT) VE KULLANICI YÖNETİMİ
     # -------------------------------------------------------------------------
@@ -239,8 +321,8 @@ class MultiTenantRepository:
         self,
         *,
         name: str,
-        slug: str,
-        report_email: str,
+        slug: Optional[str],
+        report_email: Optional[str],
         logo_url: Optional[str],
         primary_color: str,
         phone: Optional[str],
@@ -249,21 +331,23 @@ class MultiTenantRepository:
         admin_phone: str,
         admin_password: str,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        """Yeni işletmeyi (`tenants`) ve ilk yöneticiyi (`users` role='admin') tek işlemde oluşturur."""
-        clean_slug = slug.strip().lower()
+        """
+        Yeni işletmeyi (`tenants`) ve ilk yöneticiyi (`users` role='admin') tek işlemde oluşturur.
+        E-posta merkezli %100 veri izolasyonu:
+        - Kayıt olan e-posta kendi benzersiz `tenant_id` çalışma alanını oluşturur.
+        - `report_email` girilmemişse otomatik olarak yönetici e-postası (`admin_email`) atanır.
+        """
         clean_email = admin_email.strip().lower()
+        effective_report_email = (
+            report_email.strip().lower()
+            if report_email and report_email.strip()
+            else clean_email
+        )
+        clean_slug = self._build_slug(slug, name)
         pw_hash = hash_password(admin_password)
         now_iso = _utc_now_iso()
 
         if self._supabase:
-            existing_slug = (
-                self._supabase.table("tenants").select("id").eq("slug", clean_slug).execute()
-            )
-            if existing_slug.data:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"'{clean_slug}' işletme kodu (slug) zaten kullanımda.",
-                )
             existing_user = (
                 self._supabase.table("users").select("id").eq("email", clean_email).execute()
             )
@@ -272,6 +356,11 @@ class MultiTenantRepository:
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"'{clean_email}' e-posta adresi zaten kayıtlı.",
                 )
+            existing_slug = (
+                self._supabase.table("tenants").select("id").eq("slug", clean_slug).execute()
+            )
+            if existing_slug.data:
+                clean_slug = f"{clean_slug}-{secrets.token_hex(2)}"
 
             tenant_res = (
                 self._supabase.table("tenants")
@@ -280,7 +369,7 @@ class MultiTenantRepository:
                         "name": name.strip(),
                         "slug": clean_slug,
                         "logo_url": logo_url,
-                        "report_email": report_email.strip(),
+                        "report_email": effective_report_email,
                         "primary_color": primary_color or "#1E40AF",
                         "phone": phone,
                         "is_active": True,
@@ -314,16 +403,13 @@ class MultiTenantRepository:
                 ) from exc
 
         with self._lock, self._get_sqlite_conn() as conn:
-            if conn.execute("SELECT 1 FROM tenants WHERE slug = ?", (clean_slug,)).fetchone():
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"'{clean_slug}' işletme kodu (slug) zaten kullanımda.",
-                )
             if conn.execute("SELECT 1 FROM users WHERE email = ?", (clean_email,)).fetchone():
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"'{clean_email}' e-posta adresi zaten kayıtlı.",
                 )
+            if conn.execute("SELECT 1 FROM tenants WHERE slug = ?", (clean_slug,)).fetchone():
+                clean_slug = f"{clean_slug}-{secrets.token_hex(2)}"
 
             tenant_id = str(uuid.uuid4())
             admin_id = str(uuid.uuid4())
@@ -338,7 +424,7 @@ class MultiTenantRepository:
                     name.strip(),
                     clean_slug,
                     logo_url,
-                    report_email.strip(),
+                    effective_report_email,
                     primary_color or "#1E40AF",
                     phone,
                     now_iso,
@@ -762,13 +848,16 @@ class MultiTenantRepository:
 
     def get_admin_map_orders(self, tenant_id: str) -> List[Dict[str, Any]]:
         """
-        İŞ KURALI #5: 24 Saat Konumsal Görünürlük.
+        İŞ KURALI #5: 24 Saat Konumsal Görünürlük + Akıllı Durak Numaralandırma.
         `vw_admin_map_orders` mantığıyla:
-        - Aktif siparişleri (`pending`, `assigned`, `in_transit`) VE
+        - Sadece ilgili `tenant_id` işletmesine ait aktif siparişleri (`pending`, `assigned`, `in_transit`) VE
         - Son 24 saat içinde teslim edilmiş (`delivered_at >= NOW() - 24 saat`) siparişleri
           fotoğraf, imza ve `remaining_visibility_minutes` ile birlikte döner.
-        - 24 saati dolduran siparişler bu listeden otomatik düşer.
+        - Kuryelere atanmış aktif siparişleri En Yakın Komşu (Nearest-Neighbor / TSP)
+          algoritmasıyla sıralayıp `stop_sequence` ve `stop_label` ("1. Durak (En Yakın)", "2. Durak"...) ekler.
         """
+        raw_orders: List[Dict[str, Any]] = []
+
         if self._supabase:
             res = (
                 self._supabase.table("vw_admin_map_orders")
@@ -776,54 +865,89 @@ class MultiTenantRepository:
                 .eq("tenant_id", tenant_id)
                 .execute()
             )
-            return res.data
+            raw_orders = [dict(r) for r in (res.data or [])]
+        else:
+            now = _utc_now()
+            cutoff = now - timedelta(hours=settings.DELIVERED_PIN_VISIBILITY_HOURS)
 
-        now = _utc_now()
-        cutoff = now - timedelta(hours=settings.DELIVERED_PIN_VISIBILITY_HOURS)
+            with self._lock, self._get_sqlite_conn() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT o.*,
+                           u.full_name AS driver_name,
+                           u.phone AS driver_phone,
+                           u.vehicle_plate AS vehicle_plate,
+                           u.last_lat AS driver_live_lat,
+                           u.last_lng AS driver_live_lng
+                    FROM orders o
+                    LEFT JOIN users u ON u.id = o.assigned_driver_id
+                    WHERE o.tenant_id = ?
+                    ORDER BY o.created_at DESC
+                    """,
+                    (tenant_id,),
+                ).fetchall()
 
-        with self._lock, self._get_sqlite_conn() as conn:
-            rows = conn.execute(
-                """
-                SELECT o.*,
-                       u.full_name AS driver_name,
-                       u.phone AS driver_phone,
-                       u.vehicle_plate AS vehicle_plate,
-                       u.last_lat AS driver_live_lat,
-                       u.last_lng AS driver_live_lng
-                FROM orders o
-                LEFT JOIN users u ON u.id = o.assigned_driver_id
-                WHERE o.tenant_id = ?
-                ORDER BY o.created_at DESC
-                """,
-                (tenant_id,),
-            ).fetchall()
+                for raw in rows:
+                    o = _normalize_row(dict(raw))
+                    st = o["status"]
+                    remaining_minutes: Optional[int] = None
 
-            result: List[Dict[str, Any]] = []
-            for raw in rows:
-                o = _normalize_row(dict(raw))
-                st = o["status"]
-                remaining_minutes: Optional[int] = None
-
-                if st in ("pending", "assigned", "in_transit"):
-                    pass
-                elif st == "delivered":
-                    delivered_dt = _parse_iso(o.get("delivered_at"))
-                    if not delivered_dt or delivered_dt < cutoff:
+                    if st in ("pending", "assigned", "in_transit"):
+                        pass
+                    elif st == "delivered":
+                        delivered_dt = _parse_iso(o.get("delivered_at"))
+                        if not delivered_dt or delivered_dt < cutoff:
+                            continue
+                        expires_at = delivered_dt + timedelta(
+                            hours=settings.DELIVERED_PIN_VISIBILITY_HOURS
+                        )
+                        remaining_minutes = max(0, int((expires_at - now).total_seconds() // 60))
+                    else:
                         continue
-                    expires_at = delivered_dt + timedelta(
-                        hours=settings.DELIVERED_PIN_VISIBILITY_HOURS
-                    )
-                    remaining_minutes = max(0, int((expires_at - now).total_seconds() // 60))
-                else:
-                    continue
 
-                o["remaining_visibility_minutes"] = remaining_minutes
-                result.append(o)
+                    o["remaining_visibility_minutes"] = remaining_minutes
+                    raw_orders.append(o)
 
-            return result
+        # Kuryelere atanmış aktif siparişleri kurye bazında Nearest-Neighbor ile numaralandır
+        by_driver: Dict[str, List[Dict[str, Any]]] = {}
+        unassigned_active: List[Dict[str, Any]] = []
+        delivered_list: List[Dict[str, Any]] = []
 
-    def get_driver_active_orders(self, tenant_id: str, driver_id: str) -> List[Dict[str, Any]]:
-        """Kuryeye sadece kendisine atanmış aktif siparişleri salt-okunur olarak döner."""
+        for item in raw_orders:
+            if item.get("status") == "delivered":
+                delivered_list.append(item)
+            elif item.get("assigned_driver_id"):
+                drv_id = str(item["assigned_driver_id"])
+                by_driver.setdefault(drv_id, []).append(item)
+            else:
+                unassigned_active.append(item)
+
+        optimized_active: List[Dict[str, Any]] = []
+        for drv_id, drv_orders in by_driver.items():
+            start_lat = drv_orders[0].get("driver_live_lat")
+            start_lng = drv_orders[0].get("driver_live_lng")
+            sorted_drv = optimize_orders_nearest_neighbor(
+                drv_orders,
+                start_lat=float(start_lat) if start_lat is not None else None,
+                start_lng=float(start_lng) if start_lng is not None else None,
+            )
+            optimized_active.extend(sorted_drv)
+
+        return optimized_active + unassigned_active + delivered_list
+
+    def get_driver_active_orders(
+        self,
+        tenant_id: str,
+        driver_id: str,
+        current_lat: Optional[float] = None,
+        current_lng: Optional[float] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Kuryeye SADECE kendi işletmesinde (`tenant_id`) ve SADECE kendisine atanmış
+        (`assigned_driver_id == driver_id`) aktif siparişleri En Yakın Komşu (Nearest-Neighbor)
+        sırasına dizilmiş olarak salt-okunur döner.
+        """
+        orders: List[Dict[str, Any]] = []
         if self._supabase:
             res = (
                 self._supabase.table("orders")
@@ -838,23 +962,40 @@ class MultiTenantRepository:
                 .order("created_at", desc=False)
                 .execute()
             )
-            return res.data
+            orders = [dict(r) for r in (res.data or [])]
+        else:
+            with self._lock, self._get_sqlite_conn() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT id, order_number, customer_name, customer_phone, delivery_address,
+                           delivery_notes, dest_lat, dest_lng, status, tracking_token,
+                           tracking_link_enabled, created_at, updated_at
+                    FROM orders
+                    WHERE tenant_id = ?
+                      AND assigned_driver_id = ?
+                      AND status IN ('assigned', 'in_transit')
+                    ORDER BY created_at ASC
+                    """,
+                    (tenant_id, driver_id),
+                ).fetchall()
+                orders = [_normalize_row(dict(r)) for r in rows]
 
-        with self._lock, self._get_sqlite_conn() as conn:
-            rows = conn.execute(
-                """
-                SELECT id, order_number, customer_name, customer_phone, delivery_address,
-                       delivery_notes, dest_lat, dest_lng, status, tracking_token,
-                       tracking_link_enabled, created_at, updated_at
-                FROM orders
-                WHERE tenant_id = ?
-                  AND assigned_driver_id = ?
-                  AND status IN ('assigned', 'in_transit')
-                ORDER BY created_at ASC
-                """,
-                (tenant_id, driver_id),
-            ).fetchall()
-            return [_normalize_row(dict(r)) for r in rows]
+        if not orders:
+            return []
+
+        s_lat = current_lat
+        s_lng = current_lng
+        if s_lat is None or s_lng is None:
+            drv = self.get_user_by_id(tenant_id, driver_id)
+            if drv and drv.get("last_lat") is not None and drv.get("last_lng") is not None:
+                s_lat = float(drv["last_lat"])
+                s_lng = float(drv["last_lng"])
+
+        return optimize_orders_nearest_neighbor(
+            orders,
+            start_lat=s_lat,
+            start_lng=s_lng,
+        )
 
     def complete_order_delivery(
         self,

@@ -56,6 +56,8 @@ class ApiClient {
   Map<String, dynamic>? get currentUser => _currentUser;
   TenantBranding? get currentTenant => _currentTenant;
   bool get isAuthenticated => _accessToken != null && _accessToken!.isNotEmpty;
+  String? get userId => _currentUser?['id']?.toString();
+  String? get tenantId => _currentUser?['tenant_id']?.toString();
   String? get userRole => _currentUser?['role']?.toString();
   String get userFullName => (_currentUser?['full_name'] ?? '').toString();
 
@@ -117,8 +119,8 @@ class ApiClient {
   // ---------------------------------------------------------------------------
   Future<Map<String, dynamic>> registerTenant({
     required String name,
-    required String slug,
-    required String reportEmail,
+    String? slug,
+    String? reportEmail,
     String? logoUrl,
     String primaryColor = '#1E40AF',
     String? phone,
@@ -128,19 +130,25 @@ class ApiClient {
     required String adminPassword,
   }) async {
     final uri = Uri.parse('$baseUrl/api/v1/tenants/register');
+    final cleanAdminEmail = adminEmail.trim().toLowerCase();
+    final effectiveReportEmail =
+        (reportEmail != null && reportEmail.trim().isNotEmpty)
+            ? reportEmail.trim().toLowerCase()
+            : cleanAdminEmail;
+
     final response = await http.post(
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'name': name,
-        'slug': slug,
-        'report_email': reportEmail,
+        'name': name.trim(),
+        if (slug != null && slug.trim().isNotEmpty) 'slug': slug.trim().toLowerCase(),
+        'report_email': effectiveReportEmail,
         'logo_url': (logoUrl != null && logoUrl.trim().isNotEmpty) ? logoUrl.trim() : null,
-        'primary_color': primaryColor,
+        'primary_color': primaryColor.trim().isEmpty ? '#1E40AF' : primaryColor.trim(),
         'phone': phone,
-        'admin_full_name': adminFullName,
-        'admin_email': adminEmail,
-        'admin_phone': adminPhone,
+        'admin_full_name': adminFullName.trim(),
+        'admin_email': cleanAdminEmail,
+        'admin_phone': adminPhone.trim(),
         'admin_password': adminPassword,
       }),
     );
@@ -293,6 +301,40 @@ class ApiClient {
     return _decodeResponse(response);
   }
 
+  /// Bir kuryeye çoklu sipariş / çoklu durak oluştur ve ata (`POST /api/v1/orders/batch`)
+  Future<Map<String, dynamic>> createMultipleOrders({
+    String? assignedDriverId,
+    required List<Map<String, dynamic>> orders,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/orders/batch');
+    final response = await http.post(
+      uri,
+      headers: _authHeaders,
+      body: jsonEncode({
+        'assigned_driver_id': assignedDriverId,
+        'orders': orders,
+      }),
+    );
+    return _decodeResponse(response);
+  }
+
+  /// Birden fazla siparişi tek tıkla bir kuryeye ata (`POST /api/v1/orders/batch-assign`)
+  Future<Map<String, dynamic>> batchAssignOrdersToDriver({
+    required String assignedDriverId,
+    required List<String> orderIds,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/orders/batch-assign');
+    final response = await http.post(
+      uri,
+      headers: _authHeaders,
+      body: jsonEncode({
+        'assigned_driver_id': assignedDriverId,
+        'order_ids': orderIds,
+      }),
+    );
+    return _decodeResponse(response);
+  }
+
   /// Yönetici 24 Saatlik Canlı Harita verisi (`vw_admin_map_orders`)
   Future<List<Map<String, dynamic>>> getAdminMapOrders() async {
     final uri = Uri.parse('$baseUrl/api/v1/orders/admin-map');
@@ -301,9 +343,18 @@ class ApiClient {
     return list.cast<Map<String, dynamic>>();
   }
 
-  /// Kurye Salt-Okunur Sipariş Listesi
-  Future<List<Map<String, dynamic>>> getDriverAssignedOrders() async {
-    final uri = Uri.parse('$baseUrl/api/v1/orders/driver/my-orders');
+  /// Kurye Salt-Okunur Sipariş Listesi (Sadece kendi `tenant_id` ve `assigned_driver_id` görevleri)
+  Future<List<Map<String, dynamic>>> getDriverAssignedOrders({
+    double? currentLat,
+    double? currentLng,
+  }) async {
+    final queryParams = <String, String>{
+      if (currentLat != null) 'current_lat': currentLat.toString(),
+      if (currentLng != null) 'current_lng': currentLng.toString(),
+    };
+    final uri = Uri.parse('$baseUrl/api/v1/orders/driver/my-orders').replace(
+      queryParameters: queryParams.isNotEmpty ? queryParams : null,
+    );
     final response = await http.get(uri, headers: _authHeaders);
     final list = _decodeListResponse(response);
     return list.cast<Map<String, dynamic>>();

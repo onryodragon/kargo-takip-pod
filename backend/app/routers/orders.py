@@ -21,14 +21,16 @@ Zorunlu Teslimat Kanıtı (Fotoğraf + İmza) ile Teslimat Tamamlama Uç Noktala
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 from fastapi import (
     APIRouter,
     BackgroundTasks,
     Depends,
     HTTPException,
+    Query,
     Request,
     UploadFile,
     status,
@@ -40,6 +42,11 @@ from app.core.database import db
 from app.core.security import CurrentUser, require_admin, require_driver
 from app.routers.tracking import tracking_ws_manager
 from app.services.excel_mailer import ExcelPoDMailerService, OrderPoDRecord
+from app.services.routing_service import (
+    fetch_osrm_route,
+    optimize_orders_nearest_neighbor,
+    search_address_suggestions,
+)
 from app.services.storage_service import storage_service
 
 logger = logging.getLogger("pod_system.orders")
@@ -86,6 +93,19 @@ class OrderAdminAssignUpdateRequest(BaseModel):
         None,
         description="'pending', 'assigned', 'in_transit' veya 'cancelled'",
     )
+
+
+class BatchOrderCreateRequest(BaseModel):
+    assigned_driver_id: Optional[str] = Field(
+        None,
+        description="Tüm siparişlerin atanacağı kurye ID'si (her sipariş kendi içinde de ezebilir)",
+    )
+    orders: List[OrderCreateRequest] = Field(..., min_length=1)
+
+
+class BatchDriverAssignRequest(BaseModel):
+    assigned_driver_id: str = Field(..., description="Siparişlerin atanacağı kurye ID'si")
+    order_ids: List[str] = Field(..., min_length=1, description="Atanacak sipariş ID listesi")
 
 
 # ============================================================================
@@ -196,6 +216,92 @@ async def update_order_assignment_or_location(
 
 
 @router.get(
+    "/geocode/search",
+    summary="Ücretsiz Adres Arama ve Otomatik Öneri (Nominatim / Photon)",
+)
+async def search_address_autocomplete(
+    q: str = Query(..., min_length=2, description="Aranacak adres metni"),
+    limit: int = Query(6, ge=1, le=12),
+    current_user: CurrentUser = Depends(require_admin),
+) -> List[dict]:
+    """
+    Yönetici sipariş oluşturma ekranındaki adres arama çubuğu için
+    OpenStreetMap Nominatim + Komoot Photon üzerinden otomatik adres önerileri döner.
+    """
+    return await asyncio.to_thread(search_address_suggestions, q, limit)
+
+
+@router.post(
+    "/batch",
+    status_code=status.HTTP_201_CREATED,
+    summary="Bir Kuryeye Çoklu Sipariş / Çoklu Durak Oluştur ve Ata (Sadece Admin)",
+)
+async def create_multiple_orders(
+    payload: BatchOrderCreateRequest,
+    current_user: CurrentUser = Depends(require_admin),
+) -> dict:
+    """
+    Yöneticinin tek seferde birden fazla siparişi (çoklu durak) oluşturup
+    seçtiği kuryeye atamasını ve otomatik optimize edilmiş rota sırasını döner.
+    """
+    created_orders = []
+    for item in payload.orders:
+        effective_driver_id = item.assigned_driver_id or payload.assigned_driver_id
+        order = db.create_order(
+            tenant_id=current_user.tenant_id,
+            created_by=current_user.user_id,
+            order_number=item.order_number,
+            customer_name=item.customer_name,
+            customer_phone=item.customer_phone,
+            delivery_address=item.delivery_address,
+            delivery_notes=item.delivery_notes,
+            dest_lat=item.dest_lat,
+            dest_lng=item.dest_lng,
+            assigned_driver_id=effective_driver_id,
+        )
+        order["tracking_url"] = f"{settings.PUBLIC_TRACKING_WEB_URL}/{order['tracking_token']}"
+        created_orders.append(order)
+
+    return {
+        "created_count": len(created_orders),
+        "orders": created_orders,
+    }
+
+
+@router.post(
+    "/batch-assign",
+    summary="Birden Fazla Siparişi Tek Tıkla Bir Kuryeye Ata ve Rotayı Optimize Et (Sadece Admin)",
+)
+async def batch_assign_orders_to_driver(
+    payload: BatchDriverAssignRequest,
+    current_user: CurrentUser = Depends(require_admin),
+) -> dict:
+    """
+    Seçilen tüm siparişleri (`order_ids`) tek bir kuryeye (`assigned_driver_id`) atar
+    ve En Yakın Komşu (Nearest-Neighbor) algoritmasıyla optimize edilmiş durak sırasını döner.
+    """
+    updated_list = []
+    for oid in payload.order_ids:
+        updated = db.update_order_admin(
+            tenant_id=current_user.tenant_id,
+            order_id=oid,
+            updates={"assigned_driver_id": payload.assigned_driver_id},
+        )
+        updated["tracking_url"] = f"{settings.PUBLIC_TRACKING_WEB_URL}/{updated['tracking_token']}"
+        updated_list.append(updated)
+
+    optimized = db.get_driver_active_orders(
+        tenant_id=current_user.tenant_id,
+        driver_id=payload.assigned_driver_id,
+    )
+    return {
+        "assigned_count": len(updated_list),
+        "assigned_driver_id": payload.assigned_driver_id,
+        "optimized_stops": optimized,
+    }
+
+
+@router.get(
     "/admin-map",
     summary="Yönetici Haritası: Aktif + Son 24 Saat İçinde Teslim Edilen Siparişler (Sadece Admin)",
 )
@@ -203,9 +309,9 @@ async def get_admin_map_orders(
     current_user: CurrentUser = Depends(require_admin),
 ) -> List[dict]:
     """
-    İŞ KURALI #5: 24 Saat Konumsal Görünürlük.
-    `vw_admin_map_orders` görünümünü kullanarak:
-    - Aktif siparişleri (`pending`, `assigned`, `in_transit`) VE
+    İŞ KURALI #5: 24 Saat Konumsal Görünürlük + Akıllı Durak Numaralandırma.
+    Sadece yöneticinin kendi `tenant_id` işletmesine ait:
+    - Aktif siparişleri (`pending`, `assigned`, `in_transit`) En Yakın Komşu durak sırasıyla VE
     - Son 24 saat içinde teslim edilmiş (`delivered_at >= NOW() - INTERVAL '24 hours'`) siparişleri
       fotoğraf/imza URL'leri ve kalan görünürlük dakikasıyla (`remaining_visibility_minutes`) döner.
     """
@@ -214,20 +320,78 @@ async def get_admin_map_orders(
 
 @router.get(
     "/driver/my-orders",
-    summary="Kuryenin Kendisine Atanmış Aktif Siparişlerini Listele (Salt-Okunur)",
+    summary="Kuryenin Kendisine Atanmış Aktif Siparişlerini En Yakın Durak Sırasıyla Listele (Salt-Okunur)",
 )
 async def get_driver_assigned_orders(
+    current_lat: Optional[float] = Query(None, ge=-90.0, le=90.0),
+    current_lng: Optional[float] = Query(None, ge=-180.0, le=180.0),
     current_user: CurrentUser = Depends(require_driver),
 ) -> List[dict]:
     """
-    İŞ KURALI #2:
-    Kuryeye sadece kendisine atanmış aktif siparişleri salt-okunur adres ve
-    hedef koordinat (`dest_lat`, `dest_lng`) bilgisiyle listeler.
+    İŞ KURALI #2 & AKILLI YÖNLENDİRME:
+    Kuryeye SADECE kendi işletmesinde (`tenant_id`) ve SADECE kendisine atanmış
+    (`assigned_driver_id == current_user.user_id`) aktif siparişleri En Yakın Komşu
+    (Nearest-Neighbor / TSP) algoritmasıyla "1. Durak (En Yakın)", "2. Durak", "3. Durak"
+    olarak sıralanmış biçimde döner.
     """
     return db.get_driver_active_orders(
         tenant_id=current_user.tenant_id,
         driver_id=current_user.user_id,
+        current_lat=current_lat,
+        current_lng=current_lng,
     )
+
+
+@router.get(
+    "/smart-route",
+    summary="Kurye İçin En Yakın Komşu (TSP) Durak Sıralaması ve OSRM Karayolu Rotası",
+)
+async def get_smart_route_for_driver(
+    driver_id: Optional[str] = Query(None, description="Admin için kurye ID'si; kurye için kendi ID'si kullanılır"),
+    current_lat: Optional[float] = Query(None, ge=-90.0, le=90.0),
+    current_lng: Optional[float] = Query(None, ge=-180.0, le=180.0),
+    current_user: CurrentUser = Depends(require_driver),
+) -> dict:
+    """
+    Kuryenin anlık GPS konumunu (veya ilk durağı) başlangıç alarak tüm aktif sipariş
+    hedeflerini En Yakın Komşu (Nearest-Neighbor / TSP) ve ücretsiz OSRM API ile
+    en verimli teslimat sırasına dizer; durak listesini ve gerçek karayolu `polyline`
+    koordinatlarını döner.
+    """
+    target_driver_id = (
+        driver_id
+        if (current_user.role == "admin" and driver_id)
+        else current_user.user_id
+    )
+    stops = db.get_driver_active_orders(
+        tenant_id=current_user.tenant_id,
+        driver_id=target_driver_id,
+        current_lat=current_lat,
+        current_lng=current_lng,
+    )
+
+    waypoints: List[Tuple[float, float]] = []
+    start_lat = current_lat
+    start_lng = current_lng
+    if start_lat is None or start_lng is None:
+        drv = db.get_user_by_id(current_user.tenant_id, target_driver_id)
+        if drv and drv.get("last_lat") is not None and drv.get("last_lng") is not None:
+            start_lat = float(drv["last_lat"])
+            start_lng = float(drv["last_lng"])
+
+    if start_lat is not None and start_lng is not None:
+        waypoints.append((float(start_lat), float(start_lng)))
+
+    for s in stops:
+        waypoints.append((float(s["dest_lat"]), float(s["dest_lng"])))
+
+    route_info = await asyncio.to_thread(fetch_osrm_route, waypoints)
+    return {
+        "driver_id": target_driver_id,
+        "stop_count": len(stops),
+        "stops": stops,
+        "route": route_info,
+    }
 
 
 class OrderDeliverRequest(BaseModel):

@@ -78,7 +78,7 @@ class _PodDeliveryScreenState extends State<PodDeliveryScreen> {
   bool get _isReadyToComplete =>
       _recipientCtrl.text.trim().length >= 2 &&
       _photoBytes != null &&
-      !_signatureController.isEmpty &&
+      _signatureController.isNotEmpty &&
       _hasSignature &&
       !_isSubmitting;
 
@@ -153,7 +153,7 @@ class _PodDeliveryScreenState extends State<PodDeliveryScreen> {
   Widget build(BuildContext context) {
     final hasRecipient = _recipientCtrl.text.trim().length >= 2;
     final hasPhoto = _photoBytes != null;
-    final hasSig = _hasSignature && !_signatureController.isEmpty;
+    final hasSig = _hasSignature && _signatureController.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(

@@ -7,12 +7,14 @@ import 'package:latlong2/latlong.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/services/smart_routing_service.dart';
 import '../../core/theme/tenant_theme.dart';
 import '../../core/widgets/whatsapp_share_button.dart';
 import 'create_order_screen.dart';
 import 'tenant_settings_sheet.dart';
 
 /// İşletme Sahibi (Admin) 24 Saatlik Canlı Operasyon Haritası,
+/// Üstte Otomatik Adres Arama, OSRM Akıllı Çoklu Durak Rota Çizimi,
 /// Sipariş / Kurye Atama, Müşteri Geçici Takip Linki Paylaşımı ve PoD İnceleme Ekranı.
 class AdminDashboardScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -32,15 +34,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final MapController _mapController = MapController();
   Timer? _refreshTimer;
 
+  // Üstte Hızlı Adres Arama (Autocomplete)
+  final _mapSearchCtrl = TextEditingController();
+  Timer? _searchDebounce;
+  List<AddressSuggestion> _mapSuggestions = [];
+  bool _isSearchingMapAddress = false;
+  AddressSuggestion? _pinnedSearchAddress;
+
   List<Map<String, dynamic>> _mapOrders = [];
   List<Map<String, dynamic>> _drivers = [];
+  Map<String, List<LatLng>> _driverRoutePolylines = {};
   bool _isLoading = true;
+
+  static const List<Color> _routePalette = [
+    Color(0xFF2563EB),
+    Color(0xFF7C3AED),
+    Color(0xFF0D9488),
+    Color(0xFFDB2777),
+    Color(0xFFEA580C),
+  ];
 
   @override
   void initState() {
     super.initState();
     _fetchDashboardData();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 12), (_) {
       _fetchDashboardData(silent: true);
     });
   }
@@ -48,7 +66,46 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _searchDebounce?.cancel();
+    _mapSearchCtrl.dispose();
     super.dispose();
+  }
+
+  void _onMapSearchChanged(String query) {
+    _searchDebounce?.cancel();
+    if (query.trim().length < 2) {
+      setState(() {
+        _mapSuggestions = [];
+        _isSearchingMapAddress = false;
+      });
+      return;
+    }
+
+    setState(() => _isSearchingMapAddress = true);
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () async {
+      final results = await SmartRoutingService.searchAddressAutocomplete(
+        query,
+        backendBaseUrl: ApiClient.baseUrl,
+        authToken: widget.apiClient.accessToken,
+        limit: 6,
+      );
+      if (mounted) {
+        setState(() {
+          _mapSuggestions = results;
+          _isSearchingMapAddress = false;
+        });
+      }
+    });
+  }
+
+  void _selectMapSearchSuggestion(AddressSuggestion item) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _pinnedSearchAddress = item;
+      _mapSearchCtrl.text = item.displayName;
+      _mapSuggestions = [];
+    });
+    _mapController.move(item.latLng, 16.0);
   }
 
   Future<void> _fetchDashboardData({bool silent = false}) async {
@@ -60,10 +117,76 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         widget.apiClient.getAdminMapOrders(),
         widget.apiClient.listDrivers(),
       ]);
+
+      final rawOrders = results[0];
+      final drivers = results[1];
+
+      // Kuryelerin aktif siparişlerini Nearest-Neighbor ile sırala ve OSRM karayolu rotasını hesapla
+      final driverById = <String, Map<String, dynamic>>{
+        for (final d in drivers) d['id'].toString(): d,
+      };
+
+      final activeByDriver = <String, List<Map<String, dynamic>>>{};
+      final unassignedActive = <Map<String, dynamic>>[];
+      final deliveredOrders = <Map<String, dynamic>>[];
+
+      for (final o in rawOrders) {
+        if (o['status'] == 'delivered') {
+          deliveredOrders.add(o);
+        } else if (o['assigned_driver_id'] != null &&
+            o['assigned_driver_id'].toString().isNotEmpty) {
+          final dId = o['assigned_driver_id'].toString();
+          activeByDriver.putIfAbsent(dId, () => []).add(o);
+        } else {
+          unassignedActive.add(o);
+        }
+      }
+
+      final optimizedActive = <Map<String, dynamic>>[];
+      final newPolylines = <String, List<LatLng>>{};
+
+      for (final entry in activeByDriver.entries) {
+        final drvId = entry.key;
+        final drv = driverById[drvId];
+        LatLng? startPos;
+        if (drv != null && drv['last_lat'] != null && drv['last_lng'] != null) {
+          startPos = LatLng(
+            (drv['last_lat'] as num).toDouble(),
+            (drv['last_lng'] as num).toDouble(),
+          );
+        }
+
+        final sortedStops = SmartRoutingService.optimizeOrdersNearestNeighbor(
+          entry.value,
+          startPosition: startPos,
+        );
+        optimizedActive.addAll(sortedStops);
+
+        final waypoints = <LatLng>[
+          if (startPos != null) startPos,
+          ...sortedStops.map(
+            (s) => LatLng(
+              (s['dest_lat'] as num).toDouble(),
+              (s['dest_lng'] as num).toDouble(),
+            ),
+          ),
+        ];
+
+        if (waypoints.length >= 2) {
+          final osrm = await SmartRoutingService.fetchOsrmRoadRoute(waypoints);
+          newPolylines[drvId] = osrm.polylinePoints;
+        }
+      }
+
       if (mounted) {
         setState(() {
-          _mapOrders = results[0];
-          _drivers = results[1];
+          _mapOrders = [
+            ...optimizedActive,
+            ...unassignedActive,
+            ...deliveredOrders,
+          ];
+          _drivers = drivers;
+          _driverRoutePolylines = newPolylines;
           _isLoading = false;
         });
       }
@@ -111,11 +234,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } catch (_) {}
   }
 
+  Future<void> _reassignOrderDriver(Map<String, dynamic> order, String? newDriverId) async {
+    if (newDriverId == null) return;
+    try {
+      await widget.apiClient.updateOrderAssignment(
+        orderId: order['id'].toString(),
+        assignedDriverId: newDriverId,
+      );
+      await _fetchDashboardData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Kurye ataması güncellendi ve akıllı rota yeniden sıralandı.'),
+            backgroundColor: Color(0xFF16A34A),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Atama hatası: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   void _openOrderDetailsAndPoDModal(Map<String, dynamic> order) {
     final isDelivered = order['status'] == 'delivered';
     final photoUrl = order['pod_photo_url']?.toString();
     final signatureUrl = order['pod_signature_url']?.toString();
     final remainingStr = _formatRemainingVisibility(order['remaining_visibility_minutes']);
+    final stopLabel = order['stop_label']?.toString();
 
     showModalBottomSheet(
       context: context,
@@ -125,7 +274,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
       builder: (ctx) {
         return DraggableScrollableSheet(
-          initialChildSize: isDelivered ? 0.82 : 0.55,
+          initialChildSize: isDelivered ? 0.82 : 0.62,
           minChildSize: 0.4,
           maxChildSize: 0.94,
           expand: false,
@@ -159,7 +308,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           Text(
                             isDelivered
                                 ? 'TESLİM EDİLDİ • Haritada kalan süre: $remainingStr'
-                                : 'AKTİF SİPARİŞ (${order['status']})',
+                                : '${stopLabel != null ? "$stopLabel • " : ""}AKTİF SİPARİŞ (${order['status']})',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -192,12 +341,35 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     '${order['delivery_address']}\nKoordinat: ${order['dest_lat']}, ${order['dest_lng']}',
                   ),
                 ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.two_wheeler_rounded),
-                  title: Text('Atanan Kurye: ${order['driver_name'] ?? 'Henüz Atanmadı'}'),
-                  subtitle: Text('Plaka: ${order['vehicle_plate'] ?? '-'}'),
-                ),
+                if (!isDelivered && _drivers.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String?>(
+                    initialValue: order['assigned_driver_id']?.toString(),
+                    decoration: const InputDecoration(
+                      labelText: 'Atanan Kurye (Değiştir / Çoklu Görev Ata)',
+                      prefixIcon: Icon(Icons.two_wheeler_rounded),
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _drivers
+                        .map(
+                          (d) => DropdownMenuItem<String?>(
+                            value: d['id'].toString(),
+                            child: Text('${d['full_name']} (${d['vehicle_plate'] ?? ''})'),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (val) {
+                      Navigator.of(ctx).pop();
+                      _reassignOrderDriver(order, val);
+                    },
+                  ),
+                ] else
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.two_wheeler_rounded),
+                    title: Text('Atanan Kurye: ${order['driver_name'] ?? 'Henüz Atanmadı'}'),
+                    subtitle: Text('Plaka: ${order['vehicle_plate'] ?? '-'}'),
+                  ),
                 const SizedBox(height: 12),
                 WhatsAppShareButton(
                   order: order,
@@ -305,21 +477,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Future<void> _openCreateOrderScreen() async {
+  Future<void> _openCreateOrderScreen({
+    LatLng? initialLatLng,
+    String? initialAddress,
+  }) async {
     final created = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(
         builder: (_) => CreateOrderScreen(
           apiClient: widget.apiClient,
           availableDrivers: _drivers,
+          initialCenter: initialLatLng ?? const LatLng(40.9923, 29.1244),
+          initialAddress: initialAddress,
         ),
       ),
     );
     if (created != null) {
+      setState(() => _pinnedSearchAddress = null);
       await _fetchDashboardData();
       if (mounted) {
+        final count = created['created_count'];
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Sipariş #${created['order_number']} oluşturuldu!'),
+            content: Text(
+              count != null
+                  ? '$count adet sipariş oluşturuldu ve akıllı rota optimize edildi!'
+                  : 'Sipariş #${created['order_number']} oluşturuldu!',
+            ),
             backgroundColor: const Color(0xFF16A34A),
           ),
         );
@@ -350,6 +533,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final activeCount = _mapOrders.where((o) => o['status'] != 'delivered').length;
     final delivered24hCount = _mapOrders.where((o) => o['status'] == 'delivered').length;
 
+    final polylineEntries = _driverRoutePolylines.entries.toList();
+
     return Scaffold(
       appBar: WhiteLabelAppBar(
         branding: branding,
@@ -357,7 +542,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             'Yönetici Paneli • Aktif: $activeCount | Son 24s Teslim: $delivered24hCount',
         actions: [
           IconButton(
-            tooltip: 'Haritayı Yenile',
+            tooltip: 'Haritayı ve Akıllı Rotayı Yenile',
             onPressed: () => _fetchDashboardData(),
             icon: const Icon(Icons.refresh_rounded),
           ),
@@ -374,13 +559,105 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openCreateOrderScreen,
+        onPressed: () => _openCreateOrderScreen(
+          initialLatLng: _pinnedSearchAddress?.latLng,
+          initialAddress: _pinnedSearchAddress?.displayName,
+        ),
         icon: const Icon(Icons.add_location_alt_rounded),
-        label: const Text('YENİ SİPARİŞ & KURYE ATA'),
+        label: const Text('YENİ SİPARİŞ & ÇOKLU GÖREV ATA'),
       ),
       body: Column(
         children: [
-          // ÜST HARİTA: 24 SAATLİK CANLI OPERASYON HARİTASI (flutter_map / OSM)
+          // EN ÜSTTE: ÜCRETSİZ ADRES ARAMA VE OTOMATİK ÖNERİ ÇUBUĞU (AUTOCOMPLETE)
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: _mapSearchCtrl,
+                  onChanged: _onMapSearchChanged,
+                  decoration: InputDecoration(
+                    hintText: 'Haritada adres ara ve otomatik odaklan (Nominatim / Photon)...',
+                    prefixIcon: Icon(Icons.search_rounded, color: branding.primaryColor),
+                    suffixIcon: _isSearchingMapAddress
+                        ? const Padding(
+                            padding: EdgeInsets.all(12.0),
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : (_mapSearchCtrl.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded),
+                                onPressed: () {
+                                  setState(() {
+                                    _mapSearchCtrl.clear();
+                                    _mapSuggestions = [];
+                                    _pinnedSearchAddress = null;
+                                  });
+                                },
+                              )
+                            : null),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                  ),
+                ),
+                if (_mapSuggestions.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 4),
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
+                      ],
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: _mapSuggestions.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, idx) {
+                        final item = _mapSuggestions[idx];
+                        return ListTile(
+                          dense: true,
+                          leading: Icon(Icons.place_outlined, color: branding.primaryColor),
+                          title: Text(
+                            item.displayName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
+                          ),
+                          trailing: TextButton(
+                            onPressed: () {
+                              _selectMapSearchSuggestion(item);
+                              _openCreateOrderScreen(
+                                initialLatLng: item.latLng,
+                                initialAddress: item.displayName,
+                              );
+                            },
+                            child: const Text('Sipariş Aç'),
+                          ),
+                          onTap: () => _selectMapSearchSuggestion(item),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // ÜST HARİTA: 24 SAATLİK CANLI OPERASYON HARİTASI + OSRM GERÇEK YOL ROTALARI
           Expanded(
             flex: 6,
             child: Stack(
@@ -396,9 +673,63 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.podsystem.kargotakip',
                     ),
+                    // Kuryelerin OSRM Gerçek Karayolu Rotaları (Renkli PolylineLayer)
+                    if (polylineEntries.isNotEmpty)
+                      PolylineLayer(
+                        polylines: [
+                          for (int i = 0; i < polylineEntries.length; i++)
+                            Polyline(
+                              points: polylineEntries[i].value,
+                              strokeWidth: 4.5,
+                              color: _routePalette[i % _routePalette.length],
+                            ),
+                        ],
+                      ),
                     MarkerLayer(
                       markers: [
-                        // 1) Sipariş Hedef ve 24 Saatlik Teslimat Pinleri
+                        // 0) Aranan Adres Pini (Varsa)
+                        if (_pinnedSearchAddress != null)
+                          Marker(
+                            point: _pinnedSearchAddress!.latLng,
+                            width: 140,
+                            height: 72,
+                            child: GestureDetector(
+                              onTap: () => _openCreateOrderScreen(
+                                initialLatLng: _pinnedSearchAddress!.latLng,
+                                initialAddress: _pinnedSearchAddress!.displayName,
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFDC2626),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      'Seçilen Adres (Sipariş Aç)',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.add_location_alt_rounded,
+                                    size: 40,
+                                    color: Color(0xFFDC2626),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                        // 1) Sipariş Hedef (Durak Numaralı) ve 24 Saatlik Teslimat Pinleri
                         ..._mapOrders.map((order) {
                           final isDelivered = order['status'] == 'delivered';
                           final lat = (order['delivered_lat'] ?? order['dest_lat']) as num;
@@ -406,11 +737,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           final remText = _formatRemainingVisibility(
                             order['remaining_visibility_minutes'],
                           );
+                          final stopLabel = order['stop_label']?.toString();
 
                           return Marker(
                             point: LatLng(lat.toDouble(), lng.toDouble()),
-                            width: 125,
-                            height: 74,
+                            width: 145,
+                            height: 76,
                             child: GestureDetector(
                               onTap: () => _openOrderDetailsAndPoDModal(order),
                               child: Column(
@@ -424,7 +756,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     decoration: BoxDecoration(
                                       color: isDelivered
                                           ? const Color(0xFF15803D)
-                                          : const Color(0xFFD97706),
+                                          : (stopLabel != null
+                                              ? const Color(0xFF1D4ED8)
+                                              : const Color(0xFFD97706)),
                                       borderRadius: BorderRadius.circular(8),
                                       boxShadow: const [
                                         BoxShadow(color: Colors.black26, blurRadius: 4),
@@ -433,12 +767,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     child: Text(
                                       isDelivered
                                           ? '✓ #${order['order_number']} ($remText)'
-                                          : '#${order['order_number']}',
+                                          : (stopLabel != null
+                                              ? '$stopLabel • #${order['order_number']}'
+                                              : '#${order['order_number']}'),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 10,
+                                        fontSize: 9.5,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -450,7 +786,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     size: 38,
                                     color: isDelivered
                                         ? const Color(0xFF16A34A)
-                                        : const Color(0xFFEA580C),
+                                        : (stopLabel != null
+                                            ? const Color(0xFF2563EB)
+                                            : const Color(0xFFEA580C)),
                                   ),
                                 ],
                               ),
@@ -466,7 +804,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           final dLng = (driver['last_lng'] as num).toDouble();
                           return Marker(
                             point: LatLng(dLat, dLng),
-                            width: 110,
+                            width: 115,
                             height: 62,
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -527,15 +865,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
           ),
 
-          // ALT LİSTE: SİPARİŞ KARTLARI, MÜŞTERİ LİNK PAYLAŞIMI VE 24s PoD ARŞİVİ
+          // ALT LİSTE: DURAK SIRALI SİPARİŞ KARTLARI, MÜŞTERİ LİNK PAYLAŞIMI VE 24s PoD ARŞİVİ
           Expanded(
             flex: 4,
             child: _mapOrders.isEmpty
                 ? const Center(
-                    child: Text(
-                      'Haritada aktif veya son 24 saatte teslim edilmiş sipariş bulunmuyor.\nSağ alttaki butondan yeni sipariş açabilirsiniz.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Color(0xFF64748B)),
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text(
+                        'İşletmenizde henüz aktif veya son 24 saatte teslim edilmiş sipariş bulunmuyor.\n'
+                        'Üstten adres arayarak veya sağ alttaki butondan yeni sipariş ve kurye ataması yapabilirsiniz.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Color(0xFF64748B)),
+                      ),
                     ),
                   )
                 : ListView.builder(
@@ -547,6 +889,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       final remStr = _formatRemainingVisibility(
                         order['remaining_visibility_minutes'],
                       );
+                      final stopLabel = order['stop_label']?.toString();
+                      final stopSeq = order['stop_sequence'];
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
@@ -565,19 +909,57 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           leading: CircleAvatar(
                             backgroundColor: isDelivered
                                 ? const Color(0xFFDCFCE7)
-                                : const Color(0xFFFEF3C7),
-                            child: Icon(
-                              isDelivered
-                                  ? Icons.verified_rounded
-                                  : Icons.local_shipping_outlined,
-                              color: isDelivered
-                                  ? const Color(0xFF16A34A)
-                                  : const Color(0xFFD97706),
-                            ),
+                                : (stopSeq != null
+                                    ? const Color(0xFFDBEAFE)
+                                    : const Color(0xFFFEF3C7)),
+                            child: stopSeq != null && !isDelivered
+                                ? Text(
+                                    '$stopSeq',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1D4ED8),
+                                    ),
+                                  )
+                                : Icon(
+                                    isDelivered
+                                        ? Icons.verified_rounded
+                                        : Icons.local_shipping_outlined,
+                                    color: isDelivered
+                                        ? const Color(0xFF16A34A)
+                                        : const Color(0xFFD97706),
+                                  ),
                           ),
-                          title: Text(
-                            '#${order['order_number']} — ${order['customer_name']}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          title: Row(
+                            children: [
+                              if (stopLabel != null && !isDelivered) ...[
+                                Container(
+                                  margin: const EdgeInsets.only(right: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1D4ED8),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    stopLabel,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              Expanded(
+                                child: Text(
+                                  '#${order['order_number']} — ${order['customer_name']}',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

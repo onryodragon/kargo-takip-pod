@@ -36,7 +36,7 @@ EmailAddress = Annotated[
     StringConstraints(pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$", strip_whitespace=True),
 ]
 
-# Uygulama yüklenirken sıfır-manuel kurulum ve seed verilerini hazırla
+# Uygulama yüklenirken sıfır-manuel kurulum ve veritabanı şemasını hazırla
 run_auto_setup()
 
 
@@ -147,11 +147,7 @@ async def health_check():
         "supabase_connected": settings.is_supabase_enabled,
         "storage_mode": "supabase" if settings.is_supabase_enabled else "sqlite (kargo_takip.db)",
         "web_ui_bundled": (settings.STATIC_WEB_DIR / "index.html").exists(),
-        "demo_accounts": {
-            "admin": "admin@demo.com / 123456",
-            "driver": "kurye@demo.com / 123456",
-            "public_tracking_token": "demo-canli-takip-token-2026",
-        },
+        "multi_tenant_isolation": "enabled",
     }
 
 
