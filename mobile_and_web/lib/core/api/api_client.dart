@@ -60,6 +60,11 @@ class ApiClient {
   String? get tenantId => _currentUser?['tenant_id']?.toString();
   String? get userRole => _currentUser?['role']?.toString();
   String get userFullName => (_currentUser?['full_name'] ?? '').toString();
+  String get userPhone =>
+      (_currentUser?['whatsapp_phone'] ?? _currentUser?['phone'] ?? '').toString();
+  bool get isWhatsappVerified => _currentUser?['is_whatsapp_verified'] == true;
+  Map<String, dynamic>? _rawTenantMap;
+  Map<String, dynamic>? get rawTenantMap => _rawTenantMap;
 
   Map<String, String> get _authHeaders => {
         'Content-Type': 'application/json',
@@ -81,6 +86,7 @@ class ApiClient {
     }
     if (tenantRaw != null && tenantRaw.isNotEmpty) {
       final map = jsonDecode(tenantRaw) as Map<String, dynamic>;
+      _rawTenantMap = map;
       _currentTenant = TenantBranding.fromJson(map);
       themeController.applyTenantBranding(_currentTenant!);
     }
@@ -93,6 +99,7 @@ class ApiClient {
   }) async {
     _accessToken = token;
     _currentUser = user;
+    _rawTenantMap = tenant;
     _currentTenant = TenantBranding.fromJson(tenant);
     themeController.applyTenantBranding(_currentTenant!);
 
@@ -191,6 +198,10 @@ class ApiClient {
     String? reportEmail,
     String? primaryColor,
     String? phone,
+    String? smtpHost,
+    int? smtpPort,
+    String? smtpUser,
+    String? smtpPassword,
   }) async {
     final uri = Uri.parse('$baseUrl/api/v1/tenants/me');
     final payload = <String, dynamic>{
@@ -199,6 +210,11 @@ class ApiClient {
       if (reportEmail != null) 'report_email': reportEmail,
       if (primaryColor != null) 'primary_color': primaryColor,
       if (phone != null) 'phone': phone,
+      if (smtpHost != null) 'smtp_host': smtpHost,
+      if (smtpPort != null) 'smtp_port': smtpPort,
+      if (smtpUser != null) 'smtp_user': smtpUser,
+      if (smtpPassword != null && smtpPassword.trim().isNotEmpty)
+        'smtp_password': smtpPassword.trim(),
     };
 
     final response = await http.patch(
@@ -207,12 +223,154 @@ class ApiClient {
       body: jsonEncode(payload),
     );
     final updatedMap = _decodeResponse(response);
+    _rawTenantMap = updatedMap;
     _currentTenant = TenantBranding.fromJson(updatedMap);
     themeController.applyTenantBranding(_currentTenant!);
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefTenantKey, jsonEncode(updatedMap));
     return _currentTenant!;
+  }
+
+  /// GÖREV #3: Zorunlu WhatsApp Bağlama ve Doğrulama (`POST /api/v1/tenants/users/verify-whatsapp`)
+  Future<Map<String, dynamic>> verifyWhatsAppBinding(String whatsappPhone) async {
+    final uri = Uri.parse('$baseUrl/api/v1/tenants/users/verify-whatsapp');
+    final response = await http.post(
+      uri,
+      headers: _authHeaders,
+      body: jsonEncode({'whatsapp_phone': whatsappPhone.trim()}),
+    );
+    final body = _decodeResponse(response);
+    final updatedUser = body['user'] as Map<String, dynamic>;
+    _currentUser = updatedUser;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefUserKey, jsonEncode(updatedUser));
+    return updatedUser;
+  }
+
+  /// GÖREV #2: Yönetici sadece telefon numarası girerek WhatsApp kurye davetiyesi oluşturur
+  Future<Map<String, dynamic>> createDriverInvite(String phone) async {
+    final uri = Uri.parse('$baseUrl/api/v1/tenants/driver-invites');
+    final response = await http.post(
+      uri,
+      headers: _authHeaders,
+      body: jsonEncode({'phone': phone.trim()}),
+    );
+    return _decodeResponse(response);
+  }
+
+  /// GÖREV #2: WhatsApp kurye davet linki bilgisini getir (`GET /api/v1/tenants/driver-invites/{token}`)
+  Future<Map<String, dynamic>> getDriverInviteInfo(String inviteToken) async {
+    final uri = Uri.parse('$baseUrl/api/v1/tenants/driver-invites/${inviteToken.trim()}');
+    final response = await http.get(uri);
+    return _decodeResponse(response);
+  }
+
+  /// GÖREV #2: Kurye kendi bilgilerini (Ad, Plaka, Araç Cinsi, E-posta/Şifre) girerek kaydını tamamlar
+  Future<Map<String, dynamic>> acceptDriverInvite({
+    required String inviteToken,
+    required String fullName,
+    required String vehiclePlate,
+    required String vehicleType,
+    required String email,
+    String? password,
+    String? phone,
+    String? googleSub,
+  }) async {
+    final uri =
+        Uri.parse('$baseUrl/api/v1/tenants/driver-invites/${inviteToken.trim()}/accept');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'full_name': fullName.trim(),
+        'vehicle_plate': vehiclePlate.trim().toUpperCase(),
+        'vehicle_type': vehicleType.trim(),
+        'email': email.trim().toLowerCase(),
+        if (password != null && password.isNotEmpty) 'password': password,
+        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        if (googleSub != null) 'google_sub': googleSub,
+      }),
+    );
+    final body = _decodeResponse(response);
+    await _persistSession(
+      token: body['access_token'] as String,
+      user: body['user'] as Map<String, dynamic>,
+      tenant: body['tenant'] as Map<String, dynamic>,
+    );
+    return body;
+  }
+
+  /// GÖREV #6: Şifremi Unuttum — 6 haneli sıfırlama kodu (OTP) iste
+  Future<Map<String, dynamic>> forgotPassword(String email) async {
+    final uri = Uri.parse('$baseUrl/api/v1/auth/forgot-password');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email.trim().toLowerCase()}),
+    );
+    return _decodeResponse(response);
+  }
+
+  /// GÖREV #6: 6 haneli OTP kodu ile yeni şifre belirle
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/auth/reset-password');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email.trim().toLowerCase(),
+        'code': code.trim(),
+        'new_password': newPassword,
+      }),
+    );
+    return _decodeResponse(response);
+  }
+
+  /// GÖREV #7: GMS Bağımsız Google Hesabı ile Giriş / Kayıt / Kurye Davet Bağlama
+  Future<Map<String, dynamic>> authenticateWithGoogle({
+    required String email,
+    required String fullName,
+    String? idToken,
+    String? accessToken,
+    String? companyName,
+    String? phone,
+    String? inviteToken,
+    String? vehiclePlate,
+    String? vehicleType,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/auth/google');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email.trim().toLowerCase(),
+        'full_name': fullName.trim(),
+        if (idToken != null && idToken.trim().isNotEmpty) 'id_token': idToken.trim(),
+        if (accessToken != null && accessToken.trim().isNotEmpty)
+          'access_token': accessToken.trim(),
+        if (companyName != null && companyName.trim().isNotEmpty)
+          'company_name': companyName.trim(),
+        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        if (inviteToken != null && inviteToken.trim().isNotEmpty)
+          'invite_token': inviteToken.trim(),
+        if (vehiclePlate != null && vehiclePlate.trim().isNotEmpty)
+          'vehicle_plate': vehiclePlate.trim().toUpperCase(),
+        if (vehicleType != null && vehicleType.trim().isNotEmpty)
+          'vehicle_type': vehicleType.trim(),
+      }),
+    );
+    final body = _decodeResponse(response);
+    await _persistSession(
+      token: body['access_token'] as String,
+      user: body['user'] as Map<String, dynamic>,
+      tenant: body['tenant'] as Map<String, dynamic>,
+    );
+    return body;
   }
 
   Future<Map<String, dynamic>> createDriver({
@@ -335,6 +493,13 @@ class ApiClient {
     return _decodeResponse(response);
   }
 
+  /// GÖREV #1: Sipariş Silme (`DELETE /api/v1/orders/{order_id}`)
+  Future<Map<String, dynamic>> deleteOrder(String orderId) async {
+    final uri = Uri.parse('$baseUrl/api/v1/orders/$orderId');
+    final response = await http.delete(uri, headers: _authHeaders);
+    return _decodeResponse(response);
+  }
+
   /// Yönetici 24 Saatlik Canlı Harita verisi (`vw_admin_map_orders`)
   Future<List<Map<String, dynamic>>> getAdminMapOrders() async {
     final uri = Uri.parse('$baseUrl/api/v1/orders/admin-map');
@@ -453,16 +618,32 @@ class ApiClient {
     return _decodeResponse(response);
   }
 
-  String buildTrackingWebSocketUrl(String trackingToken) {
+  String get _wsBase {
     if (_customBaseUrl != null && _customBaseUrl!.trim().isNotEmpty) {
-      final wsCustom = _customBaseUrl!
+      return _customBaseUrl!
           .trim()
           .replaceAll(RegExp(r'/+$'), '')
           .replaceFirst('https://', 'wss://')
           .replaceFirst('http://', 'ws://');
-      return '$wsCustom/api/v1/tracking/ws/$trackingToken';
     }
-    return '$defaultWsBaseUrl/api/v1/tracking/ws/$trackingToken';
+    return defaultWsBaseUrl;
+  }
+
+  String buildTrackingWebSocketUrl(String trackingToken) {
+    return '$_wsBase/api/v1/tracking/ws/$trackingToken';
+  }
+
+  /// GÖREV #5: Kuryenin her 1 saniyede bir kesintisiz konum akıttığı WebSocket URL'si
+  String buildDriverStreamWebSocketUrl() {
+    final tokenParam = _accessToken != null ? '?token=${Uri.encodeQueryComponent(_accessToken!)}' : '';
+    return '$_wsBase/api/v1/tracking/ws/driver-stream$tokenParam';
+  }
+
+  /// Yönetici ve Kurye ekranlarının anlık olayları ve 1sn konumları dinlediği WebSocket URL'si
+  String buildTenantRealtimeWebSocketUrl() {
+    final tId = tenantId ?? '';
+    final tokenParam = _accessToken != null ? '?token=${Uri.encodeQueryComponent(_accessToken!)}' : '';
+    return '$_wsBase/api/v1/tracking/ws/tenant/$tId$tokenParam';
   }
 
   /// Yönetici ve Kurye ekranından müşteriye WhatsApp/SMS ile gönderilecek White-Label takip linki

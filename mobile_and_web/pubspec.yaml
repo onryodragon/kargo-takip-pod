@@ -16,8 +16,9 @@ dependencies:
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
 
-  # 2. Konum (Huawei Cihazlar için forceLocationManager: true destekli)
+  # 2. Konum ve İzinler (Huawei Cihazlar için forceLocationManager: true + Pil İzni destekli)
   geolocator: ^13.0.2
+  permission_handler: ^11.3.1
 
   # 3. Zorunlu Teslimat Kanıtı (PoD: Kamera + Ekrana İmza Pedi)
   image_picker: ^1.1.2

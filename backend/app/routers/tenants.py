@@ -1,12 +1,9 @@
 """
 tenants.py
 ----------
-Özelleştirilebilir İşletme Yapısı (Multi-Tenant & White-Label) ve Kurye Yönetimi Uç Noktaları.
-
-İş Kuralları:
-- Her işletme kayıt olduğunda kendi "İşletme Adını", logosunu, temasını ve arşivlerin
-  gideceği "Rapor E-posta Adresini" (`report_email`) belirler.
-- Sadece İşletme Sahibi (`require_admin`) işletme bilgilerini güncelleyebilir ve yeni kurye ekleyebilir.
+Özelleştirilebilir İşletme Yapısı (Multi-Tenant & White-Label),
+WhatsApp Davetiyeli Kurye Ekleme (`driver_invites`),
+Zorunlu WhatsApp Bağlama Doğrulaması ve Uygulama İçi SMTP Ayarları.
 """
 
 from __future__ import annotations
@@ -21,6 +18,7 @@ EmailAddress = Annotated[
     StringConstraints(pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$", strip_whitespace=True),
 ]
 
+from app.core.config import settings
 from app.core.database import db
 from app.core.security import (
     CurrentUser,
@@ -28,8 +26,9 @@ from app.core.security import (
     get_current_user,
     require_admin,
 )
+from app.routers.tracking import tracking_ws_manager
 
-router = APIRouter(prefix="/api/v1/tenants", tags=["1. İşletme (White-Label) & Kurye Yönetimi"])
+router = APIRouter(prefix="/api/v1/tenants", tags=["1. İşletme (White-Label) & WhatsApp Kurye Davet Yönetimi"])
 
 
 # ============================================================================
@@ -55,7 +54,7 @@ class TenantRegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailAddress = Field(..., examples=["admin@yildizekspres.com"])
+    email: EmailAddress = Field(..., examples=["info@kuzeylojistik.com"])
     password: str = Field(..., examples=["GucluSifre2026!"])
 
 
@@ -65,15 +64,47 @@ class TenantUpdateRequest(BaseModel):
     report_email: Optional[EmailAddress] = None
     primary_color: Optional[str] = None
     phone: Optional[str] = None
+    smtp_host: Optional[str] = Field(None, examples=["smtp.gmail.com"])
+    smtp_port: Optional[int] = Field(None, examples=[587])
+    smtp_user: Optional[str] = Field(None, examples=["ornek@gmail.com"])
+    smtp_password: Optional[str] = Field(None, description="Gmail 16 haneli uygulama şifresi")
 
 
 class DriverCreateRequest(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=120, examples=["Mehmet Demir"])
-    email: EmailAddress = Field(..., examples=["mehmet@yildizekspres.com"])
+    email: EmailAddress = Field(..., examples=["mehmet@kuzeylojistik.com"])
     phone: str = Field(..., examples=["+90 533 444 55 66"])
     password: str = Field(..., min_length=6, examples=["KuryeSifre123!"])
     vehicle_plate: str = Field(..., examples=["34 KRG 2026"])
     vehicle_type: Optional[str] = Field("Motosiklet", examples=["Motosiklet", "Panelvan"])
+
+
+class DriverInviteCreateRequest(BaseModel):
+    phone: str = Field(..., min_length=5, max_length=30, examples=["0532 111 22 33"])
+
+
+class DriverInviteAcceptRequest(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=120, examples=["Mehmet Demir"])
+    vehicle_plate: str = Field(..., min_length=2, max_length=30, examples=["34 KRG 2026"])
+    vehicle_type: str = Field("Motosiklet", examples=["Motosiklet", "Binek Araç", "Panelvan"])
+    email: EmailAddress = Field(..., examples=["mehmet@gmail.com"])
+    password: Optional[str] = Field(None, min_length=6)
+    phone: Optional[str] = None
+    google_sub: Optional[str] = None
+
+
+class WhatsAppVerifyRequest(BaseModel):
+    whatsapp_phone: str = Field(..., min_length=5, max_length=30, examples=["0532 111 22 33"])
+
+
+def _sanitize_tenant(tenant: dict) -> dict:
+    """Hassas SMTP şifresini maskeleyerek ancak tanımlı olup olmadığını belirterek döner."""
+    out = dict(tenant)
+    has_smtp = bool(out.get("smtp_user") and out.get("smtp_password"))
+    out["has_smtp_configured"] = has_smtp
+    if "smtp_password" in out and out["smtp_password"]:
+        out["smtp_password_masked"] = "••••••••••••••••"
+    return out
 
 
 # ============================================================================
@@ -85,10 +116,6 @@ class DriverCreateRequest(BaseModel):
     summary="Yeni İşletme (White-Label) ve İlk Admin Kullanıcısını Oluştur",
 )
 async def register_tenant(payload: TenantRegisterRequest):
-    """
-    Yeni bir işletme (`tenants`) ve işletme sahibini (`users` role='admin')
-    tek işlemde (transaction) oluşturur ve doğrudan JWT `access_token` döner.
-    """
     effective_report_email = (
         str(payload.report_email).strip().lower()
         if payload.report_email
@@ -118,7 +145,7 @@ async def register_tenant(payload: TenantRegisterRequest):
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "tenant": tenant,
+        "tenant": _sanitize_tenant(tenant),
         "user": {k: v for k, v in admin_user.items() if k != "password_hash"},
     }
 
@@ -128,10 +155,6 @@ async def register_tenant(payload: TenantRegisterRequest):
     summary="Yönetici (Admin) veya Kurye (Driver) Girişi",
 )
 async def login(payload: LoginRequest):
-    """
-    Kullanıcıyı doğrular; içinde `user_id`, `tenant_id` ve `role` ('admin' | 'driver')
-    bulunan JWT token ile işletmenin White-Label ayarlarını döner.
-    """
     user, tenant = db.authenticate_user(str(payload.email), payload.password)
     access_token = create_access_token(
         user_id=user["id"],
@@ -143,7 +166,7 @@ async def login(payload: LoginRequest):
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "tenant": tenant,
+        "tenant": _sanitize_tenant(tenant),
         "user": {k: v for k, v in user.items() if k != "password_hash"},
     }
 
@@ -153,26 +176,149 @@ async def login(payload: LoginRequest):
     summary="Aktif Kullanıcının İşletme (White-Label) Bilgilerini Getir",
 )
 async def get_my_tenant(current_user: CurrentUser = Depends(get_current_user)):
-    """Oturum açmış kullanıcının kendi `tenant_id` işletme profilini döner."""
-    return db.get_tenant_by_id(current_user.tenant_id)
+    return _sanitize_tenant(db.get_tenant_by_id(current_user.tenant_id))
 
 
 @router.patch(
     "/me",
-    summary="İşletme Adını, Logosunu, Temasını ve Rapor E-postasını Güncelle (Sadece Admin)",
+    summary="İşletme Adını, Logosunu, Temasını, Rapor E-postasını ve SMTP Ayarlarını Güncelle (Sadece Admin)",
 )
 async def update_my_tenant(
     payload: TenantUpdateRequest,
     current_user: CurrentUser = Depends(require_admin),
 ):
-    """
-    Sadece `admin` kendi işletmesinin adını, logosunu, temasını ve
-    Excel PoD arşivlerinin gideceği `report_email` adresini güncelleyebilir.
-    """
     updates = payload.model_dump(exclude_unset=True)
     if "report_email" in updates and updates["report_email"] is not None:
         updates["report_email"] = str(updates["report_email"])
-    return db.update_tenant(current_user.tenant_id, updates)
+    # Eğer smtp_password boş bırakılmışsa mevcut şifreyi ezme
+    if "smtp_password" in updates and (not updates["smtp_password"] or not str(updates["smtp_password"]).strip()):
+        del updates["smtp_password"]
+    updated = db.update_tenant(current_user.tenant_id, updates)
+    return _sanitize_tenant(updated)
+
+
+@router.post(
+    "/users/verify-whatsapp",
+    summary="Zorunlu WhatsApp Bağlama ve Doğrulama (Admin ve Kurye)",
+)
+async def verify_whatsapp_binding(
+    payload: WhatsAppVerifyRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """
+    GÖREV #3:
+    Kullanıcı WhatsApp numarasını girip "WhatsApp'ı Bağla ve Doğrula" dediğinde
+    `whatsapp_phone` ve `is_whatsapp_verified = True` olarak güncellenir.
+    """
+    updated_user = db.verify_user_whatsapp(
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.user_id,
+        whatsapp_phone=payload.whatsapp_phone,
+    )
+    return {
+        "status": "verified",
+        "user": {k: v for k, v in updated_user.items() if k != "password_hash"},
+    }
+
+
+@router.post(
+    "/driver-invites",
+    status_code=status.HTTP_201_CREATED,
+    summary="Yönetici Sadece Telefon Numarası Girerek WhatsApp Kurye Davetiyesi Oluşturur (Sadece Admin)",
+)
+async def create_driver_whatsapp_invite(
+    payload: DriverInviteCreateRequest,
+    current_user: CurrentUser = Depends(require_admin),
+):
+    """
+    GÖREV #2:
+    Yönetici sadece kuryenin telefon numarasını girer; benzersiz bir `invite_token`
+    ve `https://kargo-takip-pod.onrender.com/#/driver-invite/{invite_token}` bağlantısı üretilir.
+    """
+    invite = db.create_driver_invite(
+        tenant_id=current_user.tenant_id,
+        phone=payload.phone,
+    )
+    tenant = db.get_tenant_by_id(current_user.tenant_id)
+    base_url = settings.PUBLIC_BASE_URL.rstrip("/")
+    invite_url = f"{base_url}/#/driver-invite/{invite['invite_token']}"
+    return {
+        **invite,
+        "tenant_name": tenant["name"],
+        "invite_url": invite_url,
+    }
+
+
+@router.get(
+    "/driver-invites/{invite_token}",
+    summary="WhatsApp Kurye Davet Linki Bilgilerini Getir (Public)",
+)
+async def get_driver_invite_info(invite_token: str):
+    invite, tenant = db.get_driver_invite(invite_token)
+    return {
+        "invite_token": invite["invite_token"],
+        "phone": invite["phone"],
+        "expires_at": invite["expires_at"],
+        "tenant": {
+            "id": tenant["id"],
+            "name": tenant["name"],
+            "slug": tenant["slug"],
+            "logo_url": tenant.get("logo_url"),
+            "primary_color": tenant.get("primary_color", "#1E40AF"),
+        },
+    }
+
+
+@router.post(
+    "/driver-invites/{invite_token}/accept",
+    status_code=status.HTTP_201_CREATED,
+    summary="Kurye Davet Linkinden Kendi Bilgilerini (Ad, Plaka, Araç Cinsi, E-posta) Girerek Kaydolur (Public)",
+)
+async def accept_driver_invite_and_register(
+    invite_token: str,
+    payload: DriverInviteAcceptRequest,
+):
+    """
+    GÖREV #2:
+    Kurye WhatsApp'taki linke tıkladığında kendi bilgilerini (Ad Soyad, Araç Plakası,
+    Araç Cinsi, E-posta ve Şifre / Google) doldurup "Kaydı Tamamla" dediğinde
+    otomatik olarak o işletmenin (`tenant_id`) altına aktif kurye olarak eklenir ve
+    yöneticinin "Kuryeler" listesinde anında görünür.
+    """
+    driver_user, tenant = db.accept_driver_invite(
+        invite_token=invite_token,
+        full_name=payload.full_name,
+        email=str(payload.email),
+        password=payload.password,
+        phone=payload.phone,
+        vehicle_plate=payload.vehicle_plate,
+        vehicle_type=payload.vehicle_type,
+        google_sub=payload.google_sub,
+    )
+
+    access_token = create_access_token(
+        user_id=driver_user["id"],
+        tenant_id=tenant["id"],
+        role="driver",
+        email=driver_user["email"],
+        full_name=driver_user["full_name"],
+    )
+
+    # Yöneticinin Kuryeler listesini ve haritasını WebSocket ile anında güncelle
+    await tracking_ws_manager.broadcast_to_tenant(
+        tenant["id"],
+        {
+            "event": "driver_registered",
+            "driver": {k: v for k, v in driver_user.items() if k != "password_hash"},
+        },
+    )
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "tenant": _sanitize_tenant(tenant),
+        "user": {k: v for k, v in driver_user.items() if k != "password_hash"},
+    }
 
 
 @router.post(
@@ -184,7 +330,6 @@ async def create_tenant_driver(
     payload: DriverCreateRequest,
     current_user: CurrentUser = Depends(require_admin),
 ):
-    """Sadece `admin` kendi işletmesine (`tenant_id`) yeni saha kuryesi ekleyebilir."""
     driver = db.create_driver(
         tenant_id=current_user.tenant_id,
         full_name=payload.full_name,
@@ -204,5 +349,4 @@ async def create_tenant_driver(
 async def list_tenant_drivers(
     current_user: CurrentUser = Depends(require_admin),
 ) -> List[dict]:
-    """Sadece `admin` kendi işletmesine kayıtlı aktif kuryeleri ve son konumlarını listeler."""
     return db.list_drivers(current_user.tenant_id)

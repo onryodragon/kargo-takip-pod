@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/services/smart_routing_service.dart';
@@ -33,6 +35,8 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final MapController _mapController = MapController();
   Timer? _refreshTimer;
+  WebSocketChannel? _tenantWsChannel;
+  StreamSubscription? _tenantWsSub;
 
   // Üstte Hızlı Adres Arama (Autocomplete)
   final _mapSearchCtrl = TextEditingController();
@@ -58,6 +62,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void initState() {
     super.initState();
     _fetchDashboardData();
+    _connectTenantRealtimeWebSocket();
     _refreshTimer = Timer.periodic(const Duration(seconds: 12), (_) {
       _fetchDashboardData(silent: true);
     });
@@ -67,8 +72,73 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void dispose() {
     _refreshTimer?.cancel();
     _searchDebounce?.cancel();
+    _tenantWsSub?.cancel();
+    try {
+      _tenantWsChannel?.sink.close();
+    } catch (_) {}
     _mapSearchCtrl.dispose();
     super.dispose();
+  }
+
+  void _connectTenantRealtimeWebSocket() {
+    final wsUrl = widget.apiClient.buildTenantRealtimeWebSocketUrl();
+    if (wsUrl.isEmpty) return;
+
+    try {
+      _tenantWsSub?.cancel();
+      _tenantWsChannel?.sink.close();
+    } catch (_) {}
+
+    try {
+      _tenantWsChannel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      _tenantWsSub = _tenantWsChannel!.stream.listen(
+        (rawMessage) {
+          if (!mounted) return;
+          try {
+            final msg = jsonDecode(rawMessage.toString()) as Map<String, dynamic>;
+            final type = msg['type']?.toString() ?? '';
+
+            if (type == 'driver_location_update') {
+              final drvId = msg['driver_id']?.toString() ?? '';
+              final lat = (msg['lat'] as num?)?.toDouble();
+              final lng = (msg['lng'] as num?)?.toDouble();
+              if (drvId.isNotEmpty && lat != null && lng != null) {
+                bool found = false;
+                for (final d in _drivers) {
+                  if (d['id']?.toString() == drvId) {
+                    d['last_lat'] = lat;
+                    d['last_lng'] = lng;
+                    d['is_online'] = true;
+                    found = true;
+                    break;
+                  }
+                }
+                if (found) {
+                  setState(() {});
+                } else {
+                  _fetchDashboardData(silent: true);
+                }
+              }
+            } else if (type == 'order_deleted') {
+              final deletedId = msg['order_id']?.toString() ?? '';
+              if (deletedId.isNotEmpty) {
+                setState(() {
+                  _mapOrders.removeWhere((o) => o['id']?.toString() == deletedId);
+                });
+                _fetchDashboardData(silent: true);
+              }
+            } else if (type == 'order_created' ||
+                type == 'order_updated' ||
+                type == 'order_delivered' ||
+                type == 'driver_registered') {
+              _fetchDashboardData(silent: true);
+            }
+          } catch (_) {}
+        },
+        onError: (_) {},
+        onDone: () {},
+      );
+    } catch (_) {}
   }
 
   void _onMapSearchChanged(String query) {
@@ -256,6 +326,76 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           SnackBar(content: Text('Atama hatası: $e'), backgroundColor: Colors.red),
         );
       }
+    }
+  }
+
+  Future<void> _confirmAndDeleteOrder(
+    Map<String, dynamic> order, {
+    BuildContext? modalContext,
+  }) async {
+    final orderId = order['id']?.toString() ?? '';
+    final orderNumber = order['order_number']?.toString() ?? '';
+    final customerName = order['customer_name']?.toString() ?? '';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626)),
+            SizedBox(width: 8),
+            Expanded(child: Text('Siparişi Sil')),
+          ],
+        ),
+        content: Text(
+          '#$orderNumber ($customerName) numaralı siparişi kalıcı olarak silmek istediğinize emin misiniz?\n\n'
+          'Bu işlem geri alınamaz ve kurye ile yönetici ekranlarından anında kaldırılır.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dlgCtx).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(dlgCtx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+            ),
+            icon: const Icon(Icons.delete_forever_rounded, size: 18),
+            label: const Text('Evet, Siparişi Sil'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || orderId.isEmpty) return;
+
+    if (modalContext != null && modalContext.mounted) {
+      Navigator.of(modalContext).pop();
+    }
+
+    try {
+      await widget.apiClient.deleteOrder(orderId);
+      if (!mounted) return;
+      setState(() {
+        _mapOrders.removeWhere((o) => o['id']?.toString() == orderId);
+      });
+      await _fetchDashboardData(silent: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sipariş #$orderNumber kalıcı olarak silindi.'),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sipariş silinemedi: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -469,6 +609,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       ),
                     ),
                 ],
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () => _confirmAndDeleteOrder(
+                    order,
+                    modalContext: ctx,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFDC2626),
+                    side: const BorderSide(color: Color(0xFFDC2626)),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                  ),
+                  icon: const Icon(Icons.delete_forever_rounded, size: 20),
+                  label: const Text(
+                    'SİPARİŞİ SİL',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
               ],
             );
           },
@@ -972,10 +1129,38 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 8),
-                              WhatsAppShareButton(
-                                order: order,
-                                tenantName: branding.name,
-                                compact: true,
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  WhatsAppShareButton(
+                                    order: order,
+                                    tenantName: branding.name,
+                                    compact: true,
+                                  ),
+                                  TextButton.icon(
+                                    onPressed: () => _confirmAndDeleteOrder(order),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: const Color(0xFFDC2626),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                    ),
+                                    icon: const Icon(
+                                      Icons.delete_forever_rounded,
+                                      size: 17,
+                                    ),
+                                    label: const Text(
+                                      'Siparişi Sil',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

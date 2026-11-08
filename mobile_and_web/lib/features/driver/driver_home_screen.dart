@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/services/location_service.dart';
@@ -37,6 +41,8 @@ class DriverHomeScreen extends StatefulWidget {
 
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
   final MapController _mapController = MapController();
+  WebSocketChannel? _tenantWsChannel;
+  StreamSubscription? _tenantWsSub;
 
   List<Map<String, dynamic>> _myOrders = [];
   Map<String, dynamic>? _selectedOrder;
@@ -50,13 +56,61 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   void initState() {
     super.initState();
     widget.locationService.addListener(_onLocationUpdated);
+    _connectTenantRealtimeWebSocket();
     _loadAssignedOrders();
   }
 
   @override
   void dispose() {
     widget.locationService.removeListener(_onLocationUpdated);
+    _tenantWsSub?.cancel();
+    try {
+      _tenantWsChannel?.sink.close();
+    } catch (_) {}
     super.dispose();
+  }
+
+  void _connectTenantRealtimeWebSocket() {
+    final wsUrl = widget.apiClient.buildTenantRealtimeWebSocketUrl();
+    if (wsUrl.isEmpty) return;
+    try {
+      _tenantWsSub?.cancel();
+      _tenantWsChannel?.sink.close();
+    } catch (_) {}
+
+    try {
+      _tenantWsChannel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      _tenantWsSub = _tenantWsChannel!.stream.listen(
+        (rawMessage) {
+          if (!mounted) return;
+          try {
+            final msg = jsonDecode(rawMessage.toString()) as Map<String, dynamic>;
+            final type = msg['type']?.toString() ?? '';
+            if (type == 'order_deleted') {
+              final deletedId = msg['order_id']?.toString() ?? '';
+              if (deletedId.isNotEmpty) {
+                setState(() {
+                  _myOrders.removeWhere((o) => o['id']?.toString() == deletedId);
+                  if (_selectedOrder?['id']?.toString() == deletedId) {
+                    _selectedOrder = _myOrders.isNotEmpty ? _myOrders.first : null;
+                  }
+                });
+                widget.locationService.updateActiveOrderId(
+                  _selectedOrder?['id']?.toString(),
+                );
+                _recomputeSmartRoute(widget.locationService.currentLatLng);
+              }
+            } else if (type == 'order_created' ||
+                type == 'order_updated' ||
+                type == 'order_delivered') {
+              _loadAssignedOrders();
+            }
+          } catch (_) {}
+        },
+        onError: (_) {},
+        onDone: () {},
+      );
+    } catch (_) {}
   }
 
   void _onLocationUpdated() {

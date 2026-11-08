@@ -395,6 +395,7 @@ class ExcelPoDMailerService:
         report_email: str,
         orders: List[OrderPoDRecord],
         primary_color_hex: str = "1E40AF",
+        smtp_override: Optional[dict] = None,
     ) -> bytes:
         """
         Excel raporunu oluşturur ve işletmenin `report_email` adresine e-posta eki olarak gönderir.
@@ -494,12 +495,19 @@ class ExcelPoDMailerService:
             filename=filename,
         )
 
-        # SMTP kimlik bilgileri tanımlıysa gönder
-        if self.smtp_config.username and self.smtp_config.password:
-            with smtplib.SMTP(self.smtp_config.host, self.smtp_config.port, timeout=20) as server:
+        # SMTP kimlik bilgileri tanımlıysa gönder (Önce uygulama içi tenant SMTP ayarlarına bak)
+        eff_host = (smtp_override or {}).get("host") or self.smtp_config.host
+        eff_port = int((smtp_override or {}).get("port") or self.smtp_config.port or 587)
+        eff_user = (smtp_override or {}).get("user") or self.smtp_config.username
+        eff_pass = (smtp_override or {}).get("password") or self.smtp_config.password
+
+        if eff_user and eff_pass:
+            del msg["From"]
+            msg["From"] = f"{tenant_name} Teslimat Sistemi <{eff_user}>"
+            with smtplib.SMTP(eff_host, eff_port, timeout=20) as server:
                 if self.smtp_config.use_tls:
                     server.starttls()
-                server.login(self.smtp_config.username, self.smtp_config.password)
+                server.login(eff_user, eff_pass)
                 server.send_message(msg)
             logger.info("PoD Excel arşivi başarıyla e-posta ile gönderildi -> %s (%s)", report_email, filename)
         else:
@@ -510,6 +518,74 @@ class ExcelPoDMailerService:
             )
 
         return excel_bytes
+
+    def send_password_reset_otp_email(
+        self,
+        *,
+        to_email: str,
+        code: str,
+        full_name: str,
+        tenant_name: str,
+        smtp_override: Optional[dict] = None,
+    ) -> bool:
+        """
+        Şifremi Unuttum akışı için 6 haneli sıfırlama kodunu (OTP) kullanıcının
+        e-posta adresine gerçek SMTP üzerinden gönderir.
+        """
+        eff_host = (smtp_override or {}).get("host") or self.smtp_config.host
+        eff_port = int((smtp_override or {}).get("port") or self.smtp_config.port or 587)
+        eff_user = (smtp_override or {}).get("user") or self.smtp_config.username
+        eff_pass = (smtp_override or {}).get("password") or self.smtp_config.password
+
+        if not eff_user or not eff_pass:
+            logger.warning(
+                "SMTP bilgileri girilmediği için şifre sıfırlama e-postası gönderilemedi (Alıcı: %s, Kod: %s)",
+                to_email,
+                code,
+            )
+            return False
+
+        msg = EmailMessage()
+        msg["Subject"] = f"[{tenant_name}] Şifre Sıfırlama Kodunuz: {code}"
+        msg["From"] = f"{tenant_name} Güvenlik Merkezi <{eff_user}>"
+        msg["To"] = to_email
+
+        msg.set_content(
+            f"Merhaba {full_name},\n\n"
+            f"Şifrenizi sıfırlamak için 6 haneli doğrulama kodunuz: {code}\n"
+            f"Bu kod 15 dakika boyunca geçerlidir.\n\n"
+            f"{tenant_name} Teslimat & PoD Yönetim Sistemi"
+        )
+        msg.add_alternative(
+            f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; color: #1e293b;">
+                <div style="max-width: 480px; margin: 0 auto; border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden;">
+                  <div style="background-color: #1e40af; color: #ffffff; padding: 16px 20px;">
+                    <h3 style="margin: 0;">{tenant_name} — Şifre Sıfırlama Kodu</h3>
+                  </div>
+                  <div style="padding: 24px;">
+                    <p>Merhaba <b>{full_name}</b>,</p>
+                    <p>Hesabınızın şifresini yenilemek için aşağıdaki 6 haneli doğrulama kodunu uygulama ekranına girin:</p>
+                    <div style="background-color: #f1f5f9; border: 2px dashed #1e40af; border-radius: 10px; padding: 16px; text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #1e3a8a; margin: 20px 0;">
+                      {code}
+                    </div>
+                    <p style="font-size: 13px; color: #64748b;">Bu kod güvenlik nedeniyle 15 dakika boyunca geçerlidir.</p>
+                  </div>
+                </div>
+              </body>
+            </html>
+            """,
+            subtype="html",
+        )
+
+        with smtplib.SMTP(eff_host, eff_port, timeout=20) as server:
+            if self.smtp_config.use_tls:
+                server.starttls()
+            server.login(eff_user, eff_pass)
+            server.send_message(msg)
+        logger.info("6 haneli şifre sıfırlama kodu e-posta ile gönderildi -> %s", to_email)
+        return True
 
 
 # ============================================================================

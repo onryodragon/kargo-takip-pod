@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from app.core.auto_setup import run_auto_setup
 from app.core.config import settings
-from app.routers import orders, tenants, tracking
+from app.routers import auth, orders, tenants, tracking
 from app.services.excel_mailer import ExcelPoDMailerService, OrderPoDRecord
 
 logger = logging.getLogger("pod_system.main")
@@ -101,6 +101,7 @@ app.mount("/uploads", StaticFiles(directory=str(settings.UPLOADS_DIR)), name="up
 app.mount("/excel_arsiv", StaticFiles(directory=str(settings.EXCEL_ARCHIVE_DIR)), name="excel_arsiv")
 
 # 2. Modüler API ve WebSocket Router'larını Bağla (/api/v1/...)
+app.include_router(auth.router)
 app.include_router(tenants.router)
 app.include_router(orders.router)
 app.include_router(tracking.router)
@@ -215,9 +216,13 @@ async def export_and_mail_pod_excel(
     )
 
 
-# 3. Müşteri Doğrudan /track/{tracking_token} (Hash olmadan da) girdiğinde Flutter Web index.html sun
+# 3. Müşteri (/track/{tracking_token}) veya Kurye Davet (/driver-invite/{invite_token}) SPA yönlendirmesi
 @app.get("/track/{tracking_token}", include_in_schema=False)
-async def serve_flutter_tracking_spa(tracking_token: str):
+@app.get("/driver-invite/{invite_token}", include_in_schema=False)
+async def serve_flutter_spa_routes(
+    tracking_token: Optional[str] = None,
+    invite_token: Optional[str] = None,
+):
     index_file = settings.STATIC_WEB_DIR / "index.html"
     if index_file.exists():
         return FileResponse(str(index_file))

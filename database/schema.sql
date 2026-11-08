@@ -40,6 +40,10 @@ CREATE TABLE IF NOT EXISTS tenants (
     report_email    VARCHAR(255) NOT NULL,                      -- Excel PoD arşivlerinin gideceği e-posta
     primary_color   VARCHAR(7) DEFAULT '#1E40AF',               -- White-Label tema rengi (HEX)
     phone           VARCHAR(30),                                -- İşletme iletişim numarası
+    smtp_host       VARCHAR(150) DEFAULT 'smtp.gmail.com',
+    smtp_port       INTEGER DEFAULT 587,
+    smtp_user       VARCHAR(255),
+    smtp_password   TEXT,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -60,6 +64,9 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash   TEXT NOT NULL,                              -- Supabase Auth kullanılırsa opsiyonel tutulabilir
     vehicle_plate   VARCHAR(25),                                -- Sadece kuryeler için araç plakası (örn: 34 ABC 123)
     vehicle_type    VARCHAR(50),                                -- Motosiklet, Panelvan, Kamyonet vb.
+    whatsapp_phone  VARCHAR(30),                                -- Doğrulanmış WhatsApp numarası
+    is_whatsapp_verified BOOLEAN NOT NULL DEFAULT FALSE,        -- Zorunlu WhatsApp doğrulama durumu
+    google_sub      VARCHAR(255),                               -- GMS-bağımsız Google OAuth kimliği
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     is_online       BOOLEAN NOT NULL DEFAULT FALSE,             -- Kurye aktif vardiyada mı?
     last_lat        DOUBLE PRECISION,                           -- Kuryenin bilinen son enlemi
@@ -161,6 +168,35 @@ CREATE INDEX IF NOT EXISTS idx_location_logs_order_time ON location_logs(order_i
 CREATE INDEX IF NOT EXISTS idx_location_logs_tenant_time ON location_logs(tenant_id, recorded_at DESC);
 
 COMMENT ON TABLE location_logs IS 'Kuryelerin anlık GPS koordinat akışı (Supabase Realtime / WebSocket kaynağı).';
+
+-- ============================================================================
+-- 5.1. TABLO: driver_invites (WhatsApp Kurye Davetiyeleri)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS driver_invites (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    phone           VARCHAR(30) NOT NULL,
+    invite_token    VARCHAR(96) UNIQUE NOT NULL,
+    is_used         BOOLEAN NOT NULL DEFAULT FALSE,
+    expires_at      TIMESTAMPTZ NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_driver_invites_token ON driver_invites(invite_token);
+
+-- ============================================================================
+-- 5.2. TABLO: password_reset_codes (6 Haneli Şifre Sıfırlama OTP Kodları)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS password_reset_codes (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email           VARCHAR(255) NOT NULL,
+    code            VARCHAR(10) NOT NULL,
+    is_used         BOOLEAN NOT NULL DEFAULT FALSE,
+    expires_at      TIMESTAMPTZ NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_reset_email ON password_reset_codes(email, is_used);
 
 -- ============================================================================
 -- 6. TETİKLEYİCİLER (TRIGGERS) VE İŞ KURALLARI KORUMASI

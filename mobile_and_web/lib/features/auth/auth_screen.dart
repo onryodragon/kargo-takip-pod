@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_client.dart';
+import 'driver_invite_register_screen.dart';
+import 'forgot_password_screen.dart';
+import 'google_auth_sheet.dart';
 
-/// Yönetici / Kurye Giriş ve E-posta Merkezli Tam İzolasyonlu
-/// Yeni İşletme (Multi-Tenant White-Label) Kayıt Ekranı.
+/// Yönetici / Kurye Giriş, Şifremi Unuttum, Google Hesabı ile Bağlanma,
+/// WhatsApp Kurye Davetiyesi Kabul ve Yeni İşletme (Multi-Tenant) Kayıt Ekranı.
 class AuthScreen extends StatefulWidget {
   final ApiClient apiClient;
   final VoidCallback onAuthenticated;
@@ -41,7 +44,6 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   void initState() {
     super.initState();
-    // Yönetici e-postası yazıldıkça Excel rapor e-postası boşsa otomatik senkronize bilgi göster
     _adminEmailCtrl.addListener(() {
       if (mounted) setState(() {});
     });
@@ -127,6 +129,72 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    final res = await showGmsFreeGoogleAuthDialog(
+      context,
+      isTenantRegistration: _isRegisterMode,
+    );
+    if (res == null || !mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await widget.apiClient.authenticateWithGoogle(
+        email: res.email,
+        fullName: res.fullName,
+        idToken: res.googleSub,
+        companyName: res.tenantName ??
+            (_isRegisterMode && _tenantNameCtrl.text.trim().isNotEmpty
+                ? _tenantNameCtrl.text.trim()
+                : '${res.fullName} Lojistik'),
+        phone: res.phone,
+      );
+      if (!mounted) return;
+      widget.onAuthenticated();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _openForgotPassword() async {
+    final resetEmail = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => ForgotPasswordScreen(
+          apiClient: widget.apiClient,
+          initialEmail: _loginEmailCtrl.text.trim(),
+        ),
+      ),
+    );
+    if (resetEmail != null && resetEmail.isNotEmpty && mounted) {
+      setState(() {
+        _isRegisterMode = false;
+        _loginEmailCtrl.text = resetEmail;
+      });
+    }
+  }
+
+  Future<void> _openDriverInviteScreen() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) => DriverInviteRegisterScreen(
+          apiClient: widget.apiClient,
+          onRegistered: () {
+            Navigator.of(ctx).pop();
+            widget.onAuthenticated();
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
@@ -164,10 +232,12 @@ class _AuthScreenState extends State<AuthScreen> {
                           ? 'E-posta adresinizle işletmenize özel %100 izole çalışma alanınızı oluşturun. Fotoğraflı Excel arşivleri otomatik olarak e-postanıza gönderilir.'
                           : 'İşletme Yöneticisi (Admin) veya Saha Kuryesi (Driver) hesabınızla giriş yapın.',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                      ),
                     ),
                     const SizedBox(height: 18),
-                    // Giriş / Yeni İşletme Kaydı Sekme Butonları
                     SegmentedButton<bool>(
                       segments: const [
                         ButtonSegment<bool>(
@@ -191,7 +261,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               });
                             },
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18),
                     if (_errorMessage != null)
                       Container(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -203,7 +273,10 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                         child: Text(
                           _errorMessage!,
-                          style: const TextStyle(color: Color(0xFF991B1B), fontSize: 13),
+                          style: const TextStyle(
+                            color: Color(0xFF991B1B),
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     if (!_isRegisterMode) ...[
@@ -227,10 +300,24 @@ class _AuthScreenState extends State<AuthScreen> {
                           border: OutlineInputBorder(),
                         ),
                       ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: _isLoading ? null : _openForgotPassword,
+                          icon: const Icon(Icons.lock_reset_rounded, size: 18),
+                          label: const Text(
+                            'Şifremi Unuttum',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
                     ] else ...[
                       const Text(
                         '1. İşletme & Yönetici Hesap Bilgileri',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                       const SizedBox(height: 10),
                       TextField(
@@ -256,7 +343,8 @@ class _AuthScreenState extends State<AuthScreen> {
                         controller: _adminEmailCtrl,
                         keyboardType: TextInputType.emailAddress,
                         decoration: const InputDecoration(
-                          labelText: 'İşletme E-posta Adresi (Giriş & Excel Arşivi) *',
+                          labelText:
+                              'İşletme E-posta Adresi (Giriş & Excel Arşivi) *',
                           helperText:
                               'Bu e-posta işletmenizin özel çalışma alanını ve rapor adresini oluşturur.',
                           prefixIcon: Icon(Icons.alternate_email),
@@ -268,7 +356,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         controller: _adminPhoneCtrl,
                         keyboardType: TextInputType.phone,
                         decoration: const InputDecoration(
-                          labelText: 'Yönetici Telefon Numarası *',
+                          labelText: 'Yönetici WhatsApp Telefon Numarası *',
                           hintText: '05xx xxx xx xx',
                           prefixIcon: Icon(Icons.phone_outlined),
                           border: OutlineInputBorder(),
@@ -287,7 +375,10 @@ class _AuthScreenState extends State<AuthScreen> {
                       const Divider(height: 28),
                       const Text(
                         '2. Opsiyonel White-Label & Rapor Ayarları',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                       const SizedBox(height: 10),
                       TextField(
@@ -328,8 +419,8 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 18),
                     ],
-                    const SizedBox(height: 22),
                     ElevatedButton(
                       onPressed: _isLoading ? null : _submit,
                       child: _isLoading
@@ -348,6 +439,53 @@ class _AuthScreenState extends State<AuthScreen> {
                             ),
                     ),
                     const SizedBox(height: 10),
+
+                    // Google Hesabı ile Bağlan (Huawei / GMS-Free Uyumlu)
+                    OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _handleGoogleSignIn,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      icon: Container(
+                        width: 22,
+                        height: 22,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEA4335).withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Text(
+                          'G',
+                          style: TextStyle(
+                            color: Color(0xFFEA4335),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      label: const Text(
+                        'Google Hesabı ile Bağlan',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // WhatsApp Davet Kodu ile Kurye Kaydı
+                    OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _openDriverInviteScreen,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        foregroundColor: const Color(0xFF15803D),
+                        side: const BorderSide(color: Color(0xFF86EFAC)),
+                      ),
+                      icon: const Icon(Icons.delivery_dining_rounded, size: 20),
+                      label: const Text(
+                        'WhatsApp Davet Kodu ile Kurye Ol',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     TextButton(
                       onPressed: _isLoading
                           ? null

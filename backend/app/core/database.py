@@ -69,28 +69,35 @@ CREATE TABLE IF NOT EXISTS tenants (
     report_email    TEXT NOT NULL,
     primary_color   TEXT DEFAULT '#1E40AF',
     phone           TEXT,
+    smtp_host       TEXT DEFAULT 'smtp.gmail.com',
+    smtp_port       INTEGER DEFAULT 587,
+    smtp_user       TEXT,
+    smtp_password   TEXT,
     is_active       INTEGER NOT NULL DEFAULT 1,
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS users (
-    id              TEXT PRIMARY KEY,
-    tenant_id       TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    role            TEXT NOT NULL CHECK (role IN ('admin', 'driver')),
-    full_name       TEXT NOT NULL,
-    email           TEXT UNIQUE NOT NULL,
-    phone           TEXT NOT NULL,
-    password_hash   TEXT NOT NULL,
-    vehicle_plate   TEXT,
-    vehicle_type    TEXT,
-    is_active       INTEGER NOT NULL DEFAULT 1,
-    is_online       INTEGER NOT NULL DEFAULT 0,
-    last_lat        REAL,
-    last_lng        REAL,
-    last_seen_at    TEXT,
-    created_at      TEXT NOT NULL,
-    updated_at      TEXT NOT NULL
+    id                      TEXT PRIMARY KEY,
+    tenant_id               TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    role                    TEXT NOT NULL CHECK (role IN ('admin', 'driver')),
+    full_name               TEXT NOT NULL,
+    email                   TEXT UNIQUE NOT NULL,
+    phone                   TEXT NOT NULL,
+    password_hash           TEXT NOT NULL,
+    vehicle_plate           TEXT,
+    vehicle_type            TEXT,
+    whatsapp_phone          TEXT,
+    is_whatsapp_verified    INTEGER NOT NULL DEFAULT 0,
+    google_sub              TEXT,
+    is_active               INTEGER NOT NULL DEFAULT 1,
+    is_online               INTEGER NOT NULL DEFAULT 0,
+    last_lat                REAL,
+    last_lng                REAL,
+    last_seen_at            TEXT,
+    created_at              TEXT NOT NULL,
+    updated_at              TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_tenant_role ON users(tenant_id, role);
@@ -149,6 +156,29 @@ CREATE TABLE IF NOT EXISTS location_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_location_logs_driver_time ON location_logs(driver_id, recorded_at DESC);
+
+CREATE TABLE IF NOT EXISTS driver_invites (
+    id              TEXT PRIMARY KEY,
+    tenant_id       TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    phone           TEXT NOT NULL,
+    invite_token    TEXT UNIQUE NOT NULL,
+    is_used         INTEGER NOT NULL DEFAULT 0,
+    expires_at      TEXT NOT NULL,
+    created_at      TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_driver_invites_token ON driver_invites(invite_token);
+
+CREATE TABLE IF NOT EXISTS password_reset_codes (
+    id              TEXT PRIMARY KEY,
+    email           TEXT NOT NULL,
+    code            TEXT NOT NULL,
+    is_used         INTEGER NOT NULL DEFAULT 0,
+    expires_at      TEXT NOT NULL,
+    created_at      TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_reset_email ON password_reset_codes(email, is_used);
 """
 
 
@@ -159,6 +189,8 @@ def _normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "is_online",
         "tracking_link_enabled",
         "is_email_archived",
+        "is_whatsapp_verified",
+        "is_used",
     )
     out = dict(row)
     for bf in bool_fields:
@@ -202,11 +234,26 @@ class MultiTenantRepository:
         return conn
 
     def init_sqlite_schema(self) -> None:
-        """Yerel `kargo_takip.db` SQLite tablolarını ve kısıtlarını oluşturur."""
+        """Yerel `kargo_takip.db` SQLite tablolarını, kısıtlarını ve yeni sütun göçlerini oluşturur."""
         with self._lock:
             self._sqlite_path.parent.mkdir(parents=True, exist_ok=True)
             with self._get_sqlite_conn() as conn:
                 conn.executescript(SQLITE_SCHEMA_DDL)
+                # Mevcut veritabanları için otomatik sütun göçleri (ALTER TABLE)
+                migrations = [
+                    "ALTER TABLE tenants ADD COLUMN smtp_host TEXT DEFAULT 'smtp.gmail.com'",
+                    "ALTER TABLE tenants ADD COLUMN smtp_port INTEGER DEFAULT 587",
+                    "ALTER TABLE tenants ADD COLUMN smtp_user TEXT",
+                    "ALTER TABLE tenants ADD COLUMN smtp_password TEXT",
+                    "ALTER TABLE users ADD COLUMN whatsapp_phone TEXT",
+                    "ALTER TABLE users ADD COLUMN is_whatsapp_verified INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE users ADD COLUMN google_sub TEXT",
+                ]
+                for stmt in migrations:
+                    try:
+                        conn.execute(stmt)
+                    except Exception:
+                        pass
                 conn.commit()
 
     def reset_local_database(self) -> None:
@@ -512,8 +559,18 @@ class MultiTenantRepository:
             return _normalize_row(dict(row))
 
     def update_tenant(self, tenant_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
-        """Sadece ilgili `tenant_id` kaydının White-Label ve `report_email` ayarlarını günceller."""
-        allowed = {"name", "logo_url", "report_email", "primary_color", "phone"}
+        """Sadece ilgili `tenant_id` kaydının White-Label, `report_email` ve SMTP ayarlarını günceller."""
+        allowed = {
+            "name",
+            "logo_url",
+            "report_email",
+            "primary_color",
+            "phone",
+            "smtp_host",
+            "smtp_port",
+            "smtp_user",
+            "smtp_password",
+        }
         clean_updates = {k: v for k, v in updates.items() if k in allowed and v is not None}
         clean_updates["updated_at"] = _utc_now_iso()
 
@@ -1281,6 +1338,539 @@ class MultiTenantRepository:
                 else None
             )
             return order, tenant, driver
+
+    # -------------------------------------------------------------------------
+    # 4. SİPARİŞ SİLME, WHATSAPP DAVETİYELİ KURYE KAYDI, WHATSAPP DOĞRULAMA,
+    #    ŞİFRE SIFIRLAMA (OTP) VE GMS-BAĞIMSIZ GOOGLE GİRİŞİ
+    # -------------------------------------------------------------------------
+    def delete_order_admin(self, tenant_id: str, order_id: str) -> Dict[str, Any]:
+        """
+        Sadece ilgili `tenant_id` yöneticisi tarafından siparişi kalıcı olarak siler.
+        Silinen siparişin bilgilerini döner (WebSocket yayını için).
+        """
+        order = self.get_order_by_id(tenant_id, order_id)
+
+        if self._supabase:
+            self._supabase.table("location_logs").update({"order_id": None}).eq(
+                "tenant_id", tenant_id
+            ).eq("order_id", order_id).execute()
+            self._supabase.table("orders").delete().eq("tenant_id", tenant_id).eq(
+                "id", order_id
+            ).execute()
+            return order
+
+        with self._lock, self._get_sqlite_conn() as conn:
+            conn.execute(
+                "UPDATE location_logs SET order_id = NULL WHERE tenant_id = ? AND order_id = ?",
+                (tenant_id, order_id),
+            )
+            conn.execute(
+                "DELETE FROM orders WHERE tenant_id = ? AND id = ?",
+                (tenant_id, order_id),
+            )
+            conn.commit()
+            return order
+
+    def create_driver_invite(self, tenant_id: str, phone: str) -> Dict[str, Any]:
+        """
+        Yönetici sadece kuryenin telefon numarasını girerek WhatsApp davetiyesi oluşturur.
+        """
+        clean_phone = phone.strip()
+        if len(clean_phone) < 5:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Geçerli bir kurye telefon numarası girin.",
+            )
+        invite_id = str(uuid.uuid4())
+        invite_token = secrets.token_urlsafe(24)
+        now = _utc_now()
+        expires_at = (now + timedelta(days=7)).isoformat()
+        now_iso = now.isoformat()
+
+        if self._supabase:
+            res = (
+                self._supabase.table("driver_invites")
+                .insert(
+                    {
+                        "id": invite_id,
+                        "tenant_id": tenant_id,
+                        "phone": clean_phone,
+                        "invite_token": invite_token,
+                        "is_used": False,
+                        "expires_at": expires_at,
+                        "created_at": now_iso,
+                    }
+                )
+                .execute()
+            )
+            return res.data[0]
+
+        with self._lock, self._get_sqlite_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO driver_invites (id, tenant_id, phone, invite_token, is_used, expires_at, created_at)
+                VALUES (?, ?, ?, ?, 0, ?, ?)
+                """,
+                (invite_id, tenant_id, clean_phone, invite_token, expires_at, now_iso),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM driver_invites WHERE id = ?", (invite_id,)
+            ).fetchone()
+            return _normalize_row(dict(row))
+
+    def get_driver_invite(self, invite_token: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Davet tokenını doğrular ve `(invite, tenant)` döner."""
+        clean_token = invite_token.strip()
+        invite: Optional[Dict[str, Any]] = None
+
+        if self._supabase:
+            res = (
+                self._supabase.table("driver_invites")
+                .select("*")
+                .eq("invite_token", clean_token)
+                .execute()
+            )
+            if res.data:
+                invite = res.data[0]
+        else:
+            with self._lock, self._get_sqlite_conn() as conn:
+                row = conn.execute(
+                    "SELECT * FROM driver_invites WHERE invite_token = ?",
+                    (clean_token,),
+                ).fetchone()
+                if row:
+                    invite = _normalize_row(dict(row))
+
+        if not invite:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Kurye davet bağlantısı geçersiz veya bulunamadı.",
+            )
+        if invite.get("is_used"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Bu kurye davet bağlantısı daha önce kullanılmış.",
+            )
+        exp_dt = _parse_iso(invite.get("expires_at"))
+        if exp_dt and exp_dt < _utc_now():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Bu kurye davet bağlantısının süresi dolmuş.",
+            )
+
+        tenant = self.get_tenant_by_id(invite["tenant_id"])
+        return invite, tenant
+
+    def accept_driver_invite(
+        self,
+        *,
+        invite_token: str,
+        full_name: str,
+        email: str,
+        password: Optional[str],
+        phone: Optional[str],
+        vehicle_plate: str,
+        vehicle_type: str,
+        google_sub: Optional[str] = None,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        Kurye WhatsApp davet linkine tıklayıp kendi bilgilerini (Ad Soyad, Plaka,
+        Araç Cinsi, E-posta/Şifre veya Google) girdiğinde otomatik olarak ilgili
+        işletmenin (`tenant_id`) altına aktif kurye olarak kaydedilir.
+        """
+        invite, tenant = self.get_driver_invite(invite_token)
+        tenant_id = tenant["id"]
+        clean_email = email.strip().lower()
+        effective_phone = (phone or "").strip() or invite["phone"]
+        effective_password = password if (password and len(password) >= 6) else secrets.token_hex(12)
+        pw_hash = hash_password(effective_password)
+        now_iso = _utc_now_iso()
+
+        if self._supabase:
+            existing = self._supabase.table("users").select("id").eq("email", clean_email).execute()
+            if existing.data:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"'{clean_email}' e-posta adresi zaten kullanımda.",
+                )
+            res = (
+                self._supabase.table("users")
+                .insert(
+                    {
+                        "tenant_id": tenant_id,
+                        "role": "driver",
+                        "full_name": full_name.strip(),
+                        "email": clean_email,
+                        "phone": effective_phone,
+                        "password_hash": pw_hash,
+                        "vehicle_plate": vehicle_plate.strip().upper(),
+                        "vehicle_type": vehicle_type.strip(),
+                        "google_sub": google_sub,
+                        "is_active": True,
+                        "is_online": True,
+                    }
+                )
+                .execute()
+            )
+            self._supabase.table("driver_invites").update({"is_used": True}).eq(
+                "id", invite["id"]
+            ).execute()
+            return res.data[0], tenant
+
+        with self._lock, self._get_sqlite_conn() as conn:
+            if conn.execute("SELECT 1 FROM users WHERE email = ?", (clean_email,)).fetchone():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"'{clean_email}' e-posta adresi zaten kullanımda.",
+                )
+            driver_id = str(uuid.uuid4())
+            conn.execute(
+                """
+                INSERT INTO users (
+                    id, tenant_id, role, full_name, email, phone, password_hash,
+                    vehicle_plate, vehicle_type, google_sub, is_active, is_online, created_at, updated_at
+                )
+                VALUES (?, ?, 'driver', ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
+                """,
+                (
+                    driver_id,
+                    tenant_id,
+                    full_name.strip(),
+                    clean_email,
+                    effective_phone,
+                    pw_hash,
+                    vehicle_plate.strip().upper(),
+                    vehicle_type.strip(),
+                    google_sub,
+                    now_iso,
+                    now_iso,
+                ),
+            )
+            conn.execute(
+                "UPDATE driver_invites SET is_used = 1 WHERE id = ?",
+                (invite["id"],),
+            )
+            conn.commit()
+            user_row = conn.execute("SELECT * FROM users WHERE id = ?", (driver_id,)).fetchone()
+            return _normalize_row(dict(user_row)), tenant
+
+    def verify_user_whatsapp(
+        self, tenant_id: str, user_id: str, whatsapp_phone: str
+    ) -> Dict[str, Any]:
+        """Kullanıcının WhatsApp numarasını kaydeder ve `is_whatsapp_verified = True` yapar."""
+        clean_phone = whatsapp_phone.strip()
+        if len(clean_phone) < 5:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Geçerli bir WhatsApp telefon numarası girin.",
+            )
+        now_iso = _utc_now_iso()
+
+        if self._supabase:
+            res = (
+                self._supabase.table("users")
+                .update(
+                    {
+                        "whatsapp_phone": clean_phone,
+                        "phone": clean_phone,
+                        "is_whatsapp_verified": True,
+                        "updated_at": now_iso,
+                    }
+                )
+                .eq("tenant_id", tenant_id)
+                .eq("id", user_id)
+                .execute()
+            )
+            if not res.data:
+                raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+            return res.data[0]
+
+        with self._lock, self._get_sqlite_conn() as conn:
+            conn.execute(
+                """
+                UPDATE users
+                SET whatsapp_phone = ?,
+                    phone = ?,
+                    is_whatsapp_verified = 1,
+                    updated_at = ?
+                WHERE tenant_id = ? AND id = ?
+                """,
+                (clean_phone, clean_phone, now_iso, tenant_id, user_id),
+            )
+            conn.commit()
+            user = self.get_user_by_id(tenant_id, user_id)
+            if not user:
+                raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+            return user
+
+    def get_effective_smtp_credentials(
+        self, tenant_id: Optional[str] = None, email: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        İşletmenin kendi kaydettiği SMTP (Gmail + 16 haneli uygulama şifresi) ayarlarını,
+        yoksa veritabanında tanımlı herhangi bir aktif SMTP ayarını, o da yoksa `.env` ayarlarını döner.
+        """
+        smtp_host = settings.SMTP_HOST or "smtp.gmail.com"
+        smtp_port = int(settings.SMTP_PORT or 587)
+        smtp_user = settings.SMTP_USER or ""
+        smtp_password = settings.SMTP_PASSWORD or ""
+
+        with self._lock, self._get_sqlite_conn() as conn:
+            if tenant_id:
+                t_row = conn.execute(
+                    "SELECT smtp_host, smtp_port, smtp_user, smtp_password FROM tenants WHERE id = ?",
+                    (tenant_id,),
+                ).fetchone()
+                if t_row and t_row["smtp_user"] and t_row["smtp_password"]:
+                    return {
+                        "host": t_row["smtp_host"] or "smtp.gmail.com",
+                        "port": int(t_row["smtp_port"] or 587),
+                        "user": str(t_row["smtp_user"]).strip(),
+                        "password": str(t_row["smtp_password"]).strip(),
+                    }
+
+            if email:
+                u_row = conn.execute(
+                    """
+                    SELECT t.smtp_host, t.smtp_port, t.smtp_user, t.smtp_password
+                    FROM users u
+                    JOIN tenants t ON t.id = u.tenant_id
+                    WHERE u.email = ?
+                    """,
+                    (email.strip().lower(),),
+                ).fetchone()
+                if u_row and u_row["smtp_user"] and u_row["smtp_password"]:
+                    return {
+                        "host": u_row["smtp_host"] or "smtp.gmail.com",
+                        "port": int(u_row["smtp_port"] or 587),
+                        "user": str(u_row["smtp_user"]).strip(),
+                        "password": str(u_row["smtp_password"]).strip(),
+                    }
+
+            any_row = conn.execute(
+                """
+                SELECT smtp_host, smtp_port, smtp_user, smtp_password
+                FROM tenants
+                WHERE smtp_user IS NOT NULL AND trim(smtp_user) <> ''
+                  AND smtp_password IS NOT NULL AND trim(smtp_password) <> ''
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """
+            ).fetchone()
+            if any_row:
+                return {
+                    "host": any_row["smtp_host"] or "smtp.gmail.com",
+                    "port": int(any_row["smtp_port"] or 587),
+                    "user": str(any_row["smtp_user"]).strip(),
+                    "password": str(any_row["smtp_password"]).strip(),
+                }
+
+        return {
+            "host": smtp_host,
+            "port": smtp_port,
+            "user": smtp_user.strip(),
+            "password": smtp_password.strip(),
+        }
+
+    def create_password_reset_code(
+        self, email: str
+    ) -> Tuple[str, Dict[str, Any], Dict[str, Any]]:
+        """
+        Kullanıcının e-postası için 15 dakika geçerli 6 haneli sıfırlama kodu (OTP) üretir.
+        `(code, user, tenant)` döner.
+        """
+        clean_email = email.strip().lower()
+        user: Optional[Dict[str, Any]] = None
+
+        if self._supabase:
+            res = self._supabase.table("users").select("*").eq("email", clean_email).execute()
+            if res.data:
+                user = res.data[0]
+        else:
+            with self._lock, self._get_sqlite_conn() as conn:
+                row = conn.execute(
+                    "SELECT * FROM users WHERE email = ?", (clean_email,)
+                ).fetchone()
+                if row:
+                    user = _normalize_row(dict(row))
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Bu e-posta adresine kayıtlı bir kullanıcı bulunamadı.",
+            )
+
+        tenant = self.get_tenant_by_id(user["tenant_id"])
+        code = f"{secrets.randbelow(900000) + 100000}"
+        reset_id = str(uuid.uuid4())
+        now = _utc_now()
+        expires_at = (now + timedelta(minutes=15)).isoformat()
+        now_iso = now.isoformat()
+
+        if self._supabase:
+            self._supabase.table("password_reset_codes").insert(
+                {
+                    "id": reset_id,
+                    "email": clean_email,
+                    "code": code,
+                    "is_used": False,
+                    "expires_at": expires_at,
+                    "created_at": now_iso,
+                }
+            ).execute()
+            return code, user, tenant
+
+        with self._lock, self._get_sqlite_conn() as conn:
+            conn.execute(
+                "UPDATE password_reset_codes SET is_used = 1 WHERE email = ?",
+                (clean_email,),
+            )
+            conn.execute(
+                """
+                INSERT INTO password_reset_codes (id, email, code, is_used, expires_at, created_at)
+                VALUES (?, ?, ?, 0, ?, ?)
+                """,
+                (reset_id, clean_email, code, expires_at, now_iso),
+            )
+            conn.commit()
+            return code, user, tenant
+
+    def reset_password_with_code(
+        self, email: str, code: str, new_password: str
+    ) -> Dict[str, Any]:
+        """E-posta + 6 haneli OTP kodunu doğrular ve kullanıcının şifresini günceller."""
+        clean_email = email.strip().lower()
+        clean_code = code.strip()
+        if len(new_password) < 6:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Yeni şifre en az 6 karakter olmalıdır.",
+            )
+
+        now = _utc_now()
+        now_iso = now.isoformat()
+        pw_hash = hash_password(new_password)
+
+        with self._lock, self._get_sqlite_conn() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM password_reset_codes
+                WHERE email = ? AND code = ? AND is_used = 0
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (clean_email, clean_code),
+            ).fetchone()
+
+            if not row:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Girdiğiniz 6 haneli sıfırlama kodu hatalı veya kullanılmış.",
+                )
+
+            exp_dt = _parse_iso(row["expires_at"])
+            if exp_dt and exp_dt < now:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Sıfırlama kodunun süresi dolmuş. Lütfen yeni kod isteyin.",
+                )
+
+            conn.execute(
+                "UPDATE password_reset_codes SET is_used = 1 WHERE id = ?",
+                (row["id"],),
+            )
+            conn.execute(
+                "UPDATE users SET password_hash = ?, updated_at = ? WHERE email = ?",
+                (pw_hash, now_iso, clean_email),
+            )
+            conn.commit()
+
+            u_row = conn.execute(
+                "SELECT * FROM users WHERE email = ?", (clean_email,)
+            ).fetchone()
+            if not u_row:
+                raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+            return _normalize_row(dict(u_row))
+
+    def authenticate_or_register_google_user(
+        self,
+        *,
+        email: str,
+        full_name: str,
+        google_sub: Optional[str] = None,
+        company_name: Optional[str] = None,
+        phone: Optional[str] = None,
+        invite_token: Optional[str] = None,
+        vehicle_plate: Optional[str] = None,
+        vehicle_type: Optional[str] = None,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        GMS-Bağımsız Google Hesabı ile Giriş / Kayıt / Kurye Davet Bağlama:
+        1. Eğer `invite_token` verilmişse ve kullanıcı henüz kayıtlı değilse,
+           davet edildiği işletmenin altına kurye olarak kaydeder.
+        2. Eğer e-posta veritabanında mevcutsa doğrudan giriş yapar (ve `google_sub` bağlar).
+        3. Eğer e-posta yeni ise otomatik olarak o Google e-postası üzerine izole bir
+           işletme (`tenant_id`) ve `admin` hesabı açıp giriş yapar.
+        """
+        clean_email = email.strip().lower()
+        clean_name = (full_name or "").strip() or clean_email.split("@")[0].title()
+
+        # 1) Mevcut kullanıcı kontrolü
+        with self._lock, self._get_sqlite_conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM users WHERE email = ? AND is_active = 1",
+                (clean_email,),
+            ).fetchone()
+            if row:
+                user = _normalize_row(dict(row))
+                if google_sub and not user.get("google_sub"):
+                    conn.execute(
+                        "UPDATE users SET google_sub = ?, updated_at = ? WHERE id = ?",
+                        (google_sub, _utc_now_iso(), user["id"]),
+                    )
+                    conn.commit()
+                    user["google_sub"] = google_sub
+                tenant = self.get_tenant_by_id(user["tenant_id"])
+                return user, tenant
+
+        # 2) Kurye davetiyesi üzerinden Google ile bağlanma
+        if invite_token and invite_token.strip():
+            return self.accept_driver_invite(
+                invite_token=invite_token.strip(),
+                full_name=clean_name,
+                email=clean_email,
+                password=secrets.token_hex(12),
+                phone=phone,
+                vehicle_plate=(vehicle_plate or "34 KRG 01").strip().upper(),
+                vehicle_type=(vehicle_type or "Motosiklet").strip(),
+                google_sub=google_sub,
+            )
+
+        # 3) Yeni İşletme Sahibi (Admin) olarak Google e-postasıyla otomatik çalışma alanı oluştur
+        effective_company = (company_name or "").strip() or f"{clean_name} İşletmesi"
+        effective_phone = (phone or "").strip() or "+90 500 000 00 00"
+        tenant, admin_user = self.register_tenant_and_admin(
+            name=effective_company,
+            slug=None,
+            report_email=clean_email,
+            logo_url=None,
+            primary_color="#1E40AF",
+            phone=effective_phone,
+            admin_full_name=clean_name,
+            admin_email=clean_email,
+            admin_phone=effective_phone,
+            admin_password=secrets.token_hex(12),
+        )
+        if google_sub:
+            with self._lock, self._get_sqlite_conn() as conn:
+                conn.execute(
+                    "UPDATE users SET google_sub = ? WHERE id = ?",
+                    (google_sub, admin_user["id"]),
+                )
+                conn.commit()
+                admin_user["google_sub"] = google_sub
+        return admin_user, tenant
 
 
 db = MultiTenantRepository()

@@ -127,11 +127,13 @@ def _background_send_pod_excel_and_mark_archived(
     3. Gönderim tamamlandığında siparişi `is_email_archived = True` olarak işaretler.
     """
     try:
+        smtp_creds = db.get_effective_smtp_credentials(tenant_id=tenant_id)
         mailer_service.send_pod_excel_email(
             tenant_name=tenant_name,
             report_email=report_email,
             orders=[record],
             primary_color_hex=primary_color_hex,
+            smtp_override=smtp_creds,
         )
         db.mark_order_email_archived(tenant_id=tenant_id, order_id=order_id)
         logger.info(
@@ -177,9 +179,60 @@ async def create_new_order(
         assigned_driver_id=payload.assigned_driver_id,
     )
     tracking_url = f"{settings.PUBLIC_TRACKING_WEB_URL}/{order['tracking_token']}"
+    await tracking_ws_manager.broadcast_to_tenant(
+        current_user.tenant_id,
+        {
+            "event": "order_created",
+            "order_id": order["id"],
+            "order_number": order["order_number"],
+            "assigned_driver_id": order.get("assigned_driver_id"),
+        },
+    )
     return {
         **order,
         "tracking_url": tracking_url,
+    }
+
+
+@router.delete(
+    "/{order_id}",
+    summary="Siparişi Kalıcı Olarak Sil ve Kurye/Yönetici Ekranlarını Anında Güncelle (Sadece Admin)",
+)
+async def delete_order_endpoint(
+    order_id: str,
+    current_user: CurrentUser = Depends(require_admin),
+):
+    """
+    GÖREV #1:
+    Sadece ilgili işletmenin yöneticisi (`require_admin` ve `tenant_id` kontrolü) siparişi silebilir.
+    Sipariş silindiğinde WebSocket üzerinden hem müşteri takip odası kapatılır hem de
+    kurye ve yönetici ekranları anında güncellenir.
+    """
+    deleted = db.delete_order_admin(
+        tenant_id=current_user.tenant_id,
+        order_id=order_id,
+    )
+    tracking_token = deleted.get("tracking_token")
+    if tracking_token:
+        await tracking_ws_manager.close_tracking_room(
+            tracking_token,
+            "Bu sipariş işletme yöneticisi tarafından iptal edilmiş veya silinmiştir.",
+        )
+
+    await tracking_ws_manager.broadcast_to_tenant(
+        current_user.tenant_id,
+        {
+            "event": "order_deleted",
+            "order_id": order_id,
+            "order_number": deleted.get("order_number"),
+            "assigned_driver_id": deleted.get("assigned_driver_id"),
+        },
+    )
+    return {
+        "status": "deleted",
+        "order_id": order_id,
+        "order_number": deleted.get("order_number"),
+        "message": f"Sipariş #{deleted.get('order_number')} başarıyla silindi.",
     }
 
 
@@ -208,6 +261,14 @@ async def update_order_assignment_or_location(
         tenant_id=current_user.tenant_id,
         order_id=order_id,
         updates=updates,
+    )
+    await tracking_ws_manager.broadcast_to_tenant(
+        current_user.tenant_id,
+        {
+            "event": "order_updated",
+            "order_id": order_id,
+            "assigned_driver_id": updated.get("assigned_driver_id"),
+        },
     )
     return {
         **updated,
@@ -559,13 +620,23 @@ async def deliver_order_with_mandatory_pod(
         delivered_lng=delivered_lng,
     )
 
-    # 3. Müşteri canlı takip WebSocket odasını anında kapat
+    # 3. Müşteri canlı takip WebSocket odasını anında kapat ve yönetici ekranına bildir
     tracking_token = updated_order.get("tracking_token")
     if tracking_token:
         await tracking_ws_manager.close_tracking_room(
             tracking_token,
             "Siparişiniz teslim edilmiştir. Geçici takip bağlantısının süresi dolmuştur.",
         )
+
+    await tracking_ws_manager.broadcast_to_tenant(
+        current_user.tenant_id,
+        {
+            "event": "order_delivered",
+            "order_id": order_id,
+            "order_number": updated_order.get("order_number"),
+            "assigned_driver_id": updated_order.get("assigned_driver_id"),
+        },
+    )
 
     # 4. Arka planda (BackgroundTasks) fotoğraflı + imzalı Excel oluştur ve e-posta gönder
     tenant = db.get_tenant_by_id(current_user.tenant_id)
