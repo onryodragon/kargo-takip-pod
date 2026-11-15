@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, StringConstraints
 
 EmailAddress = Annotated[
@@ -51,6 +51,12 @@ class TenantRegisterRequest(BaseModel):
     admin_email: EmailAddress = Field(..., examples=["info@kuzeylojistik.com"])
     admin_phone: str = Field(..., examples=["+90 532 111 22 33"])
     admin_password: str = Field(..., min_length=6, examples=["GucluSifre2026!"])
+
+    # Zorunlu Kullanım Koşulları ve KVKK Sorumluluk Sözleşmesi Onayı
+    kvkk_accepted: bool = Field(
+        True,
+        description="Kullanım Koşulları ve 6698 Sayılı KVKK Kapsamında Veri Sorumlusu Sözleşmesi Onayı",
+    )
 
 
 class LoginRequest(BaseModel):
@@ -116,6 +122,11 @@ def _sanitize_tenant(tenant: dict) -> dict:
     summary="Yeni İşletme (White-Label) ve İlk Admin Kullanıcısını Oluştur",
 )
 async def register_tenant(payload: TenantRegisterRequest):
+    if not payload.kvkk_accepted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Kayıt olmak için Kullanım Koşulları ve 6698 Sayılı KVKK Veri Sorumlusu Sözleşmesi onaylanmalıdır.",
+        )
     effective_report_email = (
         str(payload.report_email).strip().lower()
         if payload.report_email

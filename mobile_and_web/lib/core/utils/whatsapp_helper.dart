@@ -1,14 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../api/api_client.dart';
+
 /// Müşteriye canlı takip linki, kuryeye kayıt davetiyesi ve kullanıcıya
 /// WhatsApp bağlama doğrulaması göndermek için telefon numarası normalize edici
 /// ve derin bağlantı (Deep-Link) yardımcısı.
 class WhatsAppHelper {
   const WhatsAppHelper._();
 
-  /// Canlı Render Web Takip Adresi
-  static const String baseWebUrl = 'https://kargo-takip-pod.onrender.com';
+  /// Canlı Web Takip Adresi (Varsayılan Render veya Özel İşletme Sunucusu)
+  static String get baseWebUrl => ApiClient.baseUrl;
 
   /// Telefon numarasını temizler ve Türkiye uluslararası formatına (`905xxxxxxxxx`) dönüştürür.
   static String normalizeTurkishPhone(String rawPhone) {
@@ -35,10 +37,12 @@ class WhatsAppHelper {
     required String customerName,
     required String tenantName,
     required String orderNumber,
-    String baseUrl = baseWebUrl,
+    String? baseUrl,
     required String trackingToken,
   }) {
-    final cleanBase = (baseUrl.trim().isEmpty ? baseWebUrl : baseUrl.trim())
+    final cleanBase = (baseUrl != null && baseUrl.trim().isNotEmpty
+            ? baseUrl.trim()
+            : baseWebUrl)
         .replaceAll(RegExp(r'/+$'), '');
     final cleanOrderNo = orderNumber.trim().replaceFirst(RegExp(r'^#+'), '');
     final trackingUrl = '$cleanBase/#/track/${trackingToken.trim()}';
@@ -86,7 +90,7 @@ class WhatsAppHelper {
     required String customerName,
     required String tenantName,
     required String orderNumber,
-    String baseUrl = baseWebUrl,
+    String? baseUrl,
     required String trackingToken,
   }) async {
     final message = buildWhiteLabelTrackingMessage(

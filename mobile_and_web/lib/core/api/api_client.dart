@@ -33,6 +33,11 @@ class ApiClient {
     return envUrl.replaceAll(RegExp(r'/+$'), '');
   }
 
+  static bool get isUsingCustomBaseUrl =>
+      _customBaseUrl != null && _customBaseUrl!.trim().isNotEmpty;
+
+  static String? get customBaseUrl => _customBaseUrl;
+
   static Future<void> setCustomBaseUrl(String url) async {
     final cleaned = url.trim().replaceAll(RegExp(r'/+$'), '');
     _customBaseUrl = cleaned.isEmpty ? null : cleaned;
@@ -135,6 +140,7 @@ class ApiClient {
     required String adminEmail,
     required String adminPhone,
     required String adminPassword,
+    bool kvkkAccepted = true,
   }) async {
     final uri = Uri.parse('$baseUrl/api/v1/tenants/register');
     final cleanAdminEmail = adminEmail.trim().toLowerCase();
@@ -157,6 +163,7 @@ class ApiClient {
         'admin_email': cleanAdminEmail,
         'admin_phone': adminPhone.trim(),
         'admin_password': adminPassword,
+        'kvkk_accepted': kvkkAccepted,
       }),
     );
 

@@ -26,6 +26,7 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   bool _isRegisterMode = false;
   bool _isLoading = false;
+  bool _kvkkAccepted = false;
   String? _errorMessage;
 
   // Giriş Alanları
@@ -75,6 +76,11 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       if (_isRegisterMode) {
+        if (!_kvkkAccepted) {
+          throw Exception(
+            'Lütfen Kullanım Koşulları ve 6698 Sayılı KVKK Veri Sorumlusu Sözleşmesini onaylayın.',
+          );
+        }
         final companyName = _tenantNameCtrl.text.trim();
         final adminName = _adminNameCtrl.text.trim();
         final adminEmail = _adminEmailCtrl.text.trim().toLowerCase();
@@ -105,6 +111,7 @@ class _AuthScreenState extends State<AuthScreen> {
           adminEmail: adminEmail,
           adminPhone: adminPhone,
           adminPassword: adminPassword,
+          kvkkAccepted: _kvkkAccepted,
         );
       } else {
         final email = _loginEmailCtrl.text.trim().toLowerCase();
@@ -199,12 +206,296 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
+  void _showKvkkDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.gavel_rounded, color: Color(0xFF1E40AF), size: 24),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Kullanım Koşulları & KVKK Veri Sorumlusu Sözleşmesi',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Container(
+            constraints: const BoxConstraints(maxWidth: 520, maxHeight: 440),
+            child: const SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'KULLANIM KOŞULLARI, HİZMET SAĞLAYICI SORUMSUZLUK KAYDI VE 6698 SAYILI KVKK KAPSAMINDA İŞLETME VERİ SORUMLUSU TAAHHÜTNAMESİ',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12.5,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    '1. ÜCRETSİZ VE "OLDUĞU GİBİ" (AS-IS) ALTYAPI ESASI:\n'
+                    '• Bu platformun yazılım, web, mobil ve sunucu altyapısı tamamen ücretsiz ve "olduğu gibi" (as-is / hiçbir garanti verilmeksizin) sunulmaktadır.\n'
+                    '• Sunucu kesintilerinden, ağ arızalarından, veri gecikmelerinden, GPS sapmalarından veya üçüncü taraf altyapılardan (Render, Supabase, Google Maps, OSRM, e-posta sağlayıcıları vb.) kaynaklanan aksaklıklardan platform geliştiricisi/sağlayıcısı hiçbir şekilde hukuki, cezai veya mali olarak sorumlu tutulamaz.\n\n'
+                    '2. 6698 SAYILI KVKK UYARINCA "VERİ SORUMLUSU" SIFATI:\n'
+                    '• Sisteme kaydedilen veya kuryeler tarafından toplanan tüm kurye, personel ve müşteri verilerinin (Ad-Soyad, Telefon Numarası, Teslimat Adresi, Canlı GPS Konum Kayıtları, Teslimat Kanıtı Fotoğrafları ve Dijital İmzalar) 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamındaki "VERİ SORUMLUSU" münhasıran kayıt olan İŞLETMEDİR.\n'
+                    '• Platform geliştiricisi teknik altyapı sağlayıcı (Veri İşleyen vasıtası) konumunda olup, işletmenin sisteme girdiği veya kuryeleri aracılığıyla topladığı verilerin içeriğinden, doğruluğundan, güvenliğinden ve mevzuata uygunluğundan kesinlikle sorumlu tutulamaz.\n\n'
+                    '3. AÇIK RIZA VE AYDINLATMA METNİ TEMİN YÜKÜMLÜLÜĞÜ:\n'
+                    '• Kuryelerden ve müşterilerden canlı konum (GPS) takibi yapılması, teslimat anında fotoğraf ve ıslak imza alınması hususunda ilgili kişilere KVKK Aydınlatma Metni sunulması ve Açık Rıza onaylarının mevzuata uygun biçimde alınması yükümlülüğü tamamen kayıt olan İŞLETMEYE aittir.\n\n'
+                    '4. CEZAİ VE HUKUKİ TAAHHÜT:\n'
+                    '• İşletme; bu sistem aracılığıyla yürüttüğü kargo, kurye, teslimat ve müşteri operasyonlarında ortaya çıkabilecek her türlü uyuşmazlık, veri ihlali, idari para cezası ve tazminat taleplerinde muhatabın yalnızca kendisi olduğunu, platform sağlayıcısının tam gayrikabili rücu sorumsuzluğunu peşinen kabul, beyan ve taahhüt eder.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.45,
+                      color: Color(0xFF334155),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Kapat'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _kvkkAccepted = true;
+                });
+                Navigator.of(ctx).pop();
+              },
+              icon: const Icon(Icons.check_circle_outline, size: 18),
+              label: const Text('Okudum ve Onaylıyorum'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF16A34A),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _openServerConfigDialog() async {
+    final serverUrlCtrl = TextEditingController(text: ApiClient.baseUrl);
+    final messenger = ScaffoldMessenger.of(context);
+    await showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final isCustom = ApiClient.isUsingCustomBaseUrl;
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Row(
+                children: [
+                  Icon(Icons.dns_rounded, color: Color(0xFF2563EB), size: 24),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Sunucu Bağlantı Ayarı (BYOS)',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isCustom
+                            ? const Color(0xFFFEF3C7)
+                            : const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isCustom
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFF93C5FD),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isCustom
+                                ? Icons.warning_amber_rounded
+                                : Icons.check_circle_outline,
+                            color: isCustom
+                                ? const Color(0xFFB45309)
+                                : const Color(0xFF1D4ED8),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              isCustom
+                                  ? 'Şu anda özel işletme sunucusu aktif.'
+                                  : 'Varsayılan ücretsiz Render bulut sunucusu aktif.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: isCustom
+                                    ? const Color(0xFF92400E)
+                                    : const Color(0xFF1E40AF),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Uygulama varsayılan olarak ortak ücretsiz Render bulut sunucusunu (https://kargo-takip-pod.onrender.com) kullanır.\n\n'
+                      'Kendi bağımsız Render, VPS veya şirket içi sunucusunu kuran işletmeler, API adresini buraya girerek tüm kargo takip ve teslimat altyapısını kendi sunucularına bağlayabilir.',
+                      style: TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: serverUrlCtrl,
+                      keyboardType: TextInputType.url,
+                      decoration: const InputDecoration(
+                        labelText: 'Sunucu API URL Adresi',
+                        hintText: 'https://sunucu-adresiniz.onrender.com',
+                        prefixIcon: Icon(Icons.link_rounded),
+                        border: OutlineInputBorder(),
+                        helperText: 'Örn: https://kargo-takip-pod.onrender.com',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                if (isCustom)
+                  TextButton.icon(
+                    onPressed: () async {
+                      await ApiClient.setCustomBaseUrl('');
+                      if (!dialogCtx.mounted) return;
+                      Navigator.of(dialogCtx).pop();
+                      if (mounted) setState(() {});
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Varsayılan Render bulut sunucusuna geri dönüldü.',
+                          ),
+                          backgroundColor: Color(0xFF16A34A),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.restore_rounded, size: 16),
+                    label: const Text('Varsayılana Sıfırla'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFFDC2626),
+                    ),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('İptal'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final entered = serverUrlCtrl.text.trim();
+                    if (entered.isEmpty) {
+                      await ApiClient.setCustomBaseUrl('');
+                    } else {
+                      if (!entered.startsWith('http://') &&
+                          !entered.startsWith('https://')) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Geçersiz URL! Adres "https://" veya "http://" ile başlamalıdır.',
+                            ),
+                            backgroundColor: Color(0xFFDC2626),
+                          ),
+                        );
+                        return;
+                      }
+                      await ApiClient.setCustomBaseUrl(entered);
+                    }
+                    if (!dialogCtx.mounted) return;
+                    Navigator.of(dialogCtx).pop();
+                    if (mounted) setState(() {});
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Sunucu adresi başarıyla güncellendi: ${ApiClient.baseUrl}',
+                        ),
+                        backgroundColor: const Color(0xFF16A34A),
+                      ),
+                    );
+                  },
+                  child: const Text('Kaydet ve Bağlan'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     final currentAdminEmail = _adminEmailCtrl.text.trim();
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 16, top: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.28),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: ApiClient.isUsingCustomBaseUrl
+                    ? const Color(0xFFF59E0B)
+                    : Colors.white24,
+              ),
+            ),
+            child: TextButton.icon(
+              onPressed: _openServerConfigDialog,
+              icon: Icon(
+                Icons.dns_rounded,
+                size: 16,
+                color: ApiClient.isUsingCustomBaseUrl
+                    ? const Color(0xFFFBBF24)
+                    : Colors.white70,
+              ),
+              label: Text(
+                ApiClient.isUsingCustomBaseUrl
+                    ? 'Özel Sunucu Aktif'
+                    : 'Sunucu Ayarı (İsteğe Bağlı)',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: ApiClient.isUsingCustomBaseUrl
+                      ? const Color(0xFFFBBF24)
+                      : Colors.white70,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -462,9 +753,86 @@ class _AuthScreenState extends State<AuthScreen> {
                         ],
                       ),
                       const SizedBox(height: 18),
+                      // Zorunlu Kullanım Koşulları ve KVKK Veri Sorumlusu Sözleşmesi
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _kvkkAccepted
+                              ? const Color(0xFFECFDF5)
+                              : const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _kvkkAccepted
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFF87171),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Checkbox(
+                              value: _kvkkAccepted,
+                              activeColor: const Color(0xFF16A34A),
+                              onChanged: (val) {
+                                setState(() {
+                                  _kvkkAccepted = val ?? false;
+                                });
+                              },
+                            ),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: _showKvkkDialog,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: RichText(
+                                    text: TextSpan(
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: _kvkkAccepted
+                                            ? const Color(0xFF065F46)
+                                            : const Color(0xFF991B1B),
+                                        height: 1.4,
+                                      ),
+                                      children: const [
+                                        TextSpan(
+                                          text: 'İşletme olarak ',
+                                        ),
+                                        TextSpan(
+                                          text:
+                                              'Kullanım Koşulları ve KVKK Veri Sorumlusu Sözleşmesi\'ni ',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            decoration: TextDecoration.underline,
+                                            color: Color(0xFF1D4ED8),
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text:
+                                              'okudum; altyapının ücretsiz sunulduğunu, tüm kurye, müşteri ve konum verilerinin hukuki ve cezai sorumluluğunun şahsıma/şirketime ait olduğunu kabul ediyorum. *',
+                                          style: TextStyle(fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                     ElevatedButton(
-                      onPressed: _isLoading ? null : _submit,
+                      onPressed: (_isLoading || (_isRegisterMode && !_kvkkAccepted))
+                          ? null
+                          : _submit,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                       child: _isLoading
                           ? const SizedBox(
                               height: 20,
@@ -476,8 +844,11 @@ class _AuthScreenState extends State<AuthScreen> {
                             )
                           : Text(
                               _isRegisterMode
-                                  ? 'İŞLETMEYİ OLUŞTUR VE YÖNETİM PANELİNİ AÇ'
+                                  ? (_kvkkAccepted
+                                      ? 'İŞLETMEYİ OLUŞTUR VE YÖNETİM PANELİNİ AÇ'
+                                      : 'SÖZLEŞMEYİ ONAYLAYIN (ZORUNLU)')
                                   : 'GİRİŞ YAP',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                     ),
                     const SizedBox(height: 10),
@@ -541,6 +912,47 @@ class _AuthScreenState extends State<AuthScreen> {
                         _isRegisterMode
                             ? 'Zaten işletme veya kurye hesabınız var mı? Giriş Yapın'
                             : 'Yeni bir şirket misiniz? Yeni İşletme Kaydı Oluşturun',
+                      ),
+                    ),
+
+                    // Sunucu Bilgisi Göstergesi (BYOS)
+                    const SizedBox(height: 12),
+                    Center(
+                      child: InkWell(
+                        onTap: _openServerConfigDialog,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.circle,
+                                size: 8,
+                                color: ApiClient.isUsingCustomBaseUrl
+                                    ? const Color(0xFFF59E0B)
+                                    : const Color(0xFF22C55E),
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  ApiClient.isUsingCustomBaseUrl
+                                      ? 'Özel Sunucu: ${ApiClient.baseUrl}'
+                                      : 'Bulut Sunucu: Render (Varsayılan)',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF64748B),
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],

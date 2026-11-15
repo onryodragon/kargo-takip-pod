@@ -64,6 +64,7 @@ class _GmsFreeGoogleAuthDialogState extends State<_GmsFreeGoogleAuthDialog> {
   late final TextEditingController _nameCtrl;
   final _tenantNameCtrl = TextEditingController();
   late final TextEditingController _phoneCtrl;
+  bool _kvkkAccepted = false;
 
   @override
   void initState() {
@@ -83,6 +84,17 @@ class _GmsFreeGoogleAuthDialogState extends State<_GmsFreeGoogleAuthDialog> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    if (widget.isTenantRegistration && !_kvkkAccepted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Lütfen Kullanım Koşulları ve KVKK Veri Sorumlusu Sözleşmesini onaylayın.',
+          ),
+          backgroundColor: Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
     final email = _emailCtrl.text.trim().toLowerCase();
     final fullName = _nameCtrl.text.trim().isEmpty
         ? email.split('@').first
@@ -210,6 +222,44 @@ class _GmsFreeGoogleAuthDialogState extends State<_GmsFreeGoogleAuthDialog> {
                     border: OutlineInputBorder(),
                   ),
                 ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _kvkkAccepted
+                        ? const Color(0xFFECFDF5)
+                        : const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _kvkkAccepted
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFFF87171),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Checkbox(
+                        value: _kvkkAccepted,
+                        activeColor: const Color(0xFF16A34A),
+                        onChanged: (val) {
+                          setState(() {
+                            _kvkkAccepted = val ?? false;
+                          });
+                        },
+                      ),
+                      const Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Ücretsiz altyapı koşullarını ve 6698 Sayılı KVKK Veri Sorumlusu sorumluluğunun işletmeme ait olduğunu kabul ediyorum.',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF334155)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ],
           ),
@@ -221,9 +271,15 @@ class _GmsFreeGoogleAuthDialogState extends State<_GmsFreeGoogleAuthDialog> {
           child: const Text('İptal'),
         ),
         FilledButton.icon(
-          onPressed: _submit,
+          onPressed: (widget.isTenantRegistration && !_kvkkAccepted)
+              ? null
+              : _submit,
           icon: const Icon(Icons.login),
-          label: const Text('Google ile Devam Et'),
+          label: Text(
+            (widget.isTenantRegistration && !_kvkkAccepted)
+                ? 'KVKK Onayı Gerekli'
+                : 'Google ile Devam Et',
+          ),
         ),
       ],
     );
