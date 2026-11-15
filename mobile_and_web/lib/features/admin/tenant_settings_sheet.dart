@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../core/api/api_client.dart';
-import '../../core/utils/whatsapp_helper.dart';
 
 /// İşletme Sahibi (Admin) için:
 /// 1. White-Label Marka Ayarları + Otomatik Excel Arşiv E-postası (`report_email`) +
@@ -23,10 +21,7 @@ class TenantSettingsSheet extends StatefulWidget {
   State<TenantSettingsSheet> createState() => _TenantSettingsSheetState();
 }
 
-class _TenantSettingsSheetState extends State<TenantSettingsSheet>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-
+class _TenantSettingsSheetState extends State<TenantSettingsSheet> {
   // White-Label, Rapor E-postası & SMTP Kontrolleri
   late final TextEditingController _nameCtrl;
   late final TextEditingController _logoUrlCtrl;
@@ -38,16 +33,9 @@ class _TenantSettingsSheetState extends State<TenantSettingsSheet>
   final _smtpPassCtrl = TextEditingController();
   bool _savingTenant = false;
 
-  // Sadece Telefon Numarası ile WhatsApp Kurye Davetiyesi Kontrolleri
-  final _invitePhoneCtrl = TextEditingController();
-  bool _sendingInvite = false;
-  String? _lastGeneratedInviteUrl;
-  List<Map<String, dynamic>> _drivers = [];
-
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     final tenant = widget.apiClient.currentTenant;
     _nameCtrl = TextEditingController(text: tenant?.name ?? '');
     _logoUrlCtrl = TextEditingController(text: tenant?.logoUrl ?? '');
@@ -55,12 +43,10 @@ class _TenantSettingsSheetState extends State<TenantSettingsSheet>
     _primaryColorCtrl = TextEditingController(
       text: tenant?.primaryColorHex ?? '#1E40AF',
     );
-    _loadTenantAndDrivers();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     _nameCtrl.dispose();
     _logoUrlCtrl.dispose();
     _reportEmailCtrl.dispose();
@@ -69,17 +55,7 @@ class _TenantSettingsSheetState extends State<TenantSettingsSheet>
     _smtpPortCtrl.dispose();
     _smtpUserCtrl.dispose();
     _smtpPassCtrl.dispose();
-    _invitePhoneCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadTenantAndDrivers() async {
-    try {
-      final list = await widget.apiClient.listDrivers();
-      if (mounted) {
-        setState(() => _drivers = list);
-      }
-    } catch (_) {}
   }
 
   Future<void> _saveTenantSettings() async {
@@ -123,65 +99,6 @@ class _TenantSettingsSheetState extends State<TenantSettingsSheet>
     }
   }
 
-  Future<void> _sendWhatsAppDriverInvite() async {
-    final rawPhone = _invitePhoneCtrl.text.trim();
-    final normalized = WhatsAppHelper.normalizeTurkishPhone(rawPhone);
-    if (normalized.length < 11) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Lütfen kuryenin geçerli WhatsApp telefon numarasını girin (Örn: 0532 000 00 00).',
-          ),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    setState(() => _sendingInvite = true);
-    try {
-      final res = await widget.apiClient.createDriverInvite(rawPhone);
-      final token = res['invite_token']?.toString() ?? '';
-      final currentBase = ApiClient.baseUrl;
-      final inviteUrl =
-          '$currentBase/#/driver-invite/$token?api=${Uri.encodeComponent(currentBase)}';
-
-      setState(() {
-        _lastGeneratedInviteUrl = inviteUrl;
-      });
-
-      await WhatsAppHelper.sendDriverInviteViaWhatsApp(
-        driverPhone: rawPhone,
-        tenantName:
-            widget.apiClient.currentTenant?.name ?? 'Teslimat Sistemi',
-        inviteUrl: inviteUrl,
-      );
-
-      _invitePhoneCtrl.clear();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Kurye davetiyesi oluşturuldu ve WhatsApp'a yönlendirildi!",
-            ),
-            backgroundColor: Color(0xFF16A34A),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Davetiye oluşturulamadı: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _sendingInvite = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -193,14 +110,14 @@ class _TenantSettingsSheetState extends State<TenantSettingsSheet>
         return Column(
           children: [
             Container(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 10),
               child: Row(
                 children: [
                   const Icon(Icons.tune_rounded),
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
-                      'İşletme, SMTP & WhatsApp Kurye Yönetimi',
+                      'İşletme, Marka & SMTP E-Posta Ayarları',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
@@ -214,28 +131,12 @@ class _TenantSettingsSheetState extends State<TenantSettingsSheet>
                 ],
               ),
             ),
-            TabBar(
-              controller: _tabController,
-              tabs: const [
-                Tab(
-                  icon: Icon(Icons.mail_lock_outlined),
-                  text: 'Marka, Excel & SMTP',
-                ),
-                Tab(
-                  icon: Icon(Icons.two_wheeler_rounded),
-                  text: 'Kurye Davet & Liste',
-                ),
-              ],
-            ),
+            const Divider(height: 1),
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.all(20),
                 children: [
-                  // 1. SEKME: WHITE-LABEL, EXCEL ARŞİV & GERÇEK SMTP E-POSTA AYARLARI
-                  ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(20),
-                    children: [
                       const Text(
                         '1. White-Label Marka & Fotoğraflı Excel Arşiv Ayarları',
                         style: TextStyle(
@@ -380,220 +281,41 @@ class _TenantSettingsSheetState extends State<TenantSettingsSheet>
                               : 'TÜM AYARLARI KAYDET VE UYGULA',
                         ),
                       ),
-                    ],
-                  ),
-
-                  // 2. SEKME: WHATSAPP DAVETİYESİ İLE KURYE EKLEME VE LİSTELEME
-                  ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(20),
-                    children: [
+                      const SizedBox(height: 18),
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF0FDF4),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF86EFAC)),
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFF93C5FD)),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                        child: const Row(
                           children: [
-                            const Row(
-                              children: [
-                                Icon(
-                                  Icons.chat_rounded,
-                                  color: Color(0xFF15803D),
-                                ),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    "WhatsApp'tan Kurye Davetiyesi Gönder",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 15.5,
-                                      color: Color(0xFF14532D),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            Icon(
+                              Icons.delivery_dining_rounded,
+                              color: Color(0xFF1D4ED8),
+                              size: 24,
                             ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Sadece kuryenin telefon numarasını girin. Kurye WhatsApp linkine tıkladığında kendi Ad Soyad, Araç Plakası, Araç Cinsi ve Şifresini girerek otomatik olarak işletmenize kaydolur.',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: Color(0xFF166534),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            TextField(
-                              controller: _invitePhoneCtrl,
-                              keyboardType: TextInputType.phone,
-                              decoration: const InputDecoration(
-                                filled: true,
-                                fillColor: Colors.white,
-                                labelText: 'Kuryenin Telefon Numarası *',
-                                hintText: '05xx xxx xx xx',
-                                prefixIcon: Icon(
-                                  Icons.phone_android_rounded,
-                                  color: Color(0xFF15803D),
-                                ),
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            FilledButton.icon(
-                              onPressed: _sendingInvite
-                                  ? null
-                                  : _sendWhatsAppDriverInvite,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF25D366),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                              ),
-                              icon: _sendingInvite
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Icon(Icons.send_rounded),
-                              label: const Text(
-                                "WhatsApp'tan Davetiye Gönder",
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Sürücü davet etme, anlık filo haritası ve doğrudan görev atama işlemleri için ana navigasyondaki "Sürücüler" sekmesini kullanabilirsiniz.',
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14.5,
+                                  fontSize: 12.5,
+                                  color: Color(0xFF1E40AF),
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
-                            if (_lastGeneratedInviteUrl != null) ...[
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      'Son Davet Linki: $_lastGeneratedInviteUrl',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 11.5,
-                                        color: Color(0xFF166534),
-                                      ),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    onPressed: () {
-                                      Clipboard.setData(
-                                        ClipboardData(
-                                          text: _lastGeneratedInviteUrl!,
-                                        ),
-                                      );
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Davet linki panoya kopyalandı.',
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(
-                                      Icons.copy_rounded,
-                                      size: 18,
-                                    ),
-                                    tooltip: 'Linki Kopyala',
-                                  ),
-                                ],
-                              ),
-                            ],
                           ],
                         ),
                       ),
-                      const Divider(height: 30),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Kayıtlı Kuryeler (${_drivers.length})',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: _loadTenantAndDrivers,
-                            icon: const Icon(Icons.refresh, size: 20),
-                            tooltip: 'Listeyi Yenile',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      if (_drivers.isEmpty)
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Text(
-                            'Henüz kayıtlı kurye yok. Yukarıdan telefon numarası girerek WhatsApp davetiyesi gönderin.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
-                        ),
-                      ..._drivers.map(
-                        (d) => Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: d['is_online'] == true
-                                  ? const Color(0xFFDCFCE7)
-                                  : const Color(0xFFF1F5F9),
-                              child: Icon(
-                                Icons.two_wheeler_rounded,
-                                color: d['is_online'] == true
-                                    ? const Color(0xFF16A34A)
-                                    : const Color(0xFF64748B),
-                              ),
-                            ),
-                            title: Text(
-                              '${d['full_name']} (${d['vehicle_plate'] ?? '-'})',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            subtitle: Text(
-                              '${d['vehicle_type'] ?? 'Motosiklet'} • ${d['phone'] ?? ''} • ${d['email'] ?? ''}',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            trailing: Chip(
-                              label: Text(
-                                d['is_online'] == true
-                                    ? 'Canlıda'
-                                    : 'Çevrimdışı',
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
-                ],
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         );
-      },
-    );
   }
 }

@@ -14,6 +14,7 @@ import '../../core/services/smart_routing_service.dart';
 import '../../core/theme/tenant_theme.dart';
 import '../../core/widgets/animated_saas_widgets.dart';
 import '../../core/widgets/whatsapp_share_button.dart';
+import 'admin_drivers_tab.dart';
 import 'create_order_screen.dart';
 import 'tenant_settings_sheet.dart';
 
@@ -51,6 +52,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<Map<String, dynamic>> _drivers = [];
   Map<String, List<LatLng>> _driverRoutePolylines = {};
   bool _isLoading = true;
+  int _selectedNavIndex = 0;
 
   static const List<Color> _routePalette = [
     Color(0xFF2563EB),
@@ -653,6 +655,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _openCreateOrderScreen({
     LatLng? initialLatLng,
     String? initialAddress,
+    String? initialDriverId,
   }) async {
     final created = await Navigator.of(context).push<Map<String, dynamic>>(
       createSmoothPageRoute(
@@ -661,6 +664,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           availableDrivers: _drivers,
           initialCenter: initialLatLng ?? const LatLng(40.9923, 29.1244),
           initialAddress: initialAddress,
+          initialDriverId: initialDriverId,
         ),
       ),
     );
@@ -711,16 +715,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Scaffold(
       appBar: WhiteLabelAppBar(
         branding: branding,
-        subtitle:
-            'Yönetici Paneli • Aktif: $activeCount | Son 24s Teslim: $delivered24hCount',
+        subtitle: _selectedNavIndex == 0
+            ? 'Yönetici Paneli • Aktif: $activeCount | Son 24s Teslim: $delivered24hCount'
+            : 'Sürücüler & Filo Yönetimi • Toplam: ${_drivers.length} Kurye',
         actions: [
           IconButton(
-            tooltip: 'Haritayı ve Akıllı Rotayı Yenile',
+            tooltip: _selectedNavIndex == 0
+                ? 'Haritayı ve Akıllı Rotayı Yenile'
+                : 'Sürücüleri ve Konumları Yenile',
             onPressed: () => _fetchDashboardData(),
             icon: const Icon(Icons.refresh_rounded),
           ),
           IconButton(
-            tooltip: 'White-Label & Kurye Ayarları',
+            tooltip: 'White-Label & SMTP Ayarları',
             onPressed: _openTenantSettings,
             icon: const Icon(Icons.settings_outlined),
           ),
@@ -733,17 +740,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openCreateOrderScreen(
-          initialLatLng: _pinnedSearchAddress?.latLng,
-          initialAddress: _pinnedSearchAddress?.displayName,
+          initialLatLng:
+              _selectedNavIndex == 0 ? _pinnedSearchAddress?.latLng : null,
+          initialAddress:
+              _selectedNavIndex == 0 ? _pinnedSearchAddress?.displayName : null,
         ),
-        icon: const Icon(Icons.add_location_alt_rounded),
-        label: const Text('YENİ SİPARİŞ & ÇOKLU GÖREV ATA'),
+        icon: Icon(_selectedNavIndex == 0
+            ? Icons.add_location_alt_rounded
+            : Icons.add_task_rounded),
+        label: Text(_selectedNavIndex == 0
+            ? 'YENİ SİPARİŞ & ÇOKLU GÖREV ATA'
+            : 'YENİ GÖREV ATA 🚀'),
       ),
-      body: Column(
-        children: [
-          // EN ÜSTTE: ÜCRETSİZ ADRES ARAMA VE OTOMATİK ÖNERİ ÇUBUĞU (AUTOCOMPLETE)
-          Container(
-            color: Colors.white,
+      body: _selectedNavIndex == 1
+          ? AdminDriversTab(
+              apiClient: widget.apiClient,
+              onRefreshNeeded: () => _fetchDashboardData(silent: true),
+              onAssignTask: (driverId) =>
+                  _openCreateOrderScreen(initialDriverId: driverId),
+            )
+          : Column(
+              children: [
+                // EN ÜSTTE: ÜCRETSİZ ADRES ARAMA VE OTOMATİK ÖNERİ ÇUBUĞU (AUTOCOMPLETE)
+                Container(
+                  color: Colors.white,
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1130,6 +1150,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           );
                     },
                   ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedNavIndex,
+        onTap: (idx) {
+          setState(() => _selectedNavIndex = idx);
+          if (idx == 1) {
+            _fetchDashboardData(silent: true);
+          }
+        },
+        selectedItemColor: branding.primaryColor,
+        unselectedItemColor: const Color(0xFF64748B),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.map_rounded),
+            activeIcon: Icon(Icons.map),
+            label: 'Siparişler & Harita',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.delivery_dining_rounded),
+            activeIcon: Icon(Icons.delivery_dining),
+            label: 'Sürücüler & Filo',
           ),
         ],
       ),

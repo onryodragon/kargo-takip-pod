@@ -16,6 +16,7 @@ class CreateOrderScreen extends StatefulWidget {
   final List<Map<String, dynamic>> availableDrivers;
   final LatLng initialCenter;
   final String? initialAddress;
+  final String? initialDriverId;
 
   const CreateOrderScreen({
     super.key,
@@ -23,6 +24,7 @@ class CreateOrderScreen extends StatefulWidget {
     required this.availableDrivers,
     this.initialCenter = const LatLng(40.9923, 29.1244),
     this.initialAddress,
+    this.initialDriverId,
   });
 
   @override
@@ -62,7 +64,11 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       _addressCtrl.text = widget.initialAddress!.trim();
       _searchCtrl.text = widget.initialAddress!.trim();
     }
-    if (widget.availableDrivers.isNotEmpty) {
+    if (widget.initialDriverId != null &&
+        widget.availableDrivers
+            .any((d) => d['id']?.toString() == widget.initialDriverId)) {
+      _selectedDriverId = widget.initialDriverId;
+    } else if (widget.availableDrivers.isNotEmpty) {
       _selectedDriverId = widget.availableDrivers.first['id']?.toString();
     }
   }

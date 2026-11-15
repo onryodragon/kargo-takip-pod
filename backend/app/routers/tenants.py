@@ -355,9 +355,49 @@ async def create_tenant_driver(
 
 @router.get(
     "/drivers",
-    summary="İşletmenin Tüm Kuryelerini ve Son Konumlarını Listele (Sadece Admin)",
+    summary="İşletmenin Tüm Kuryelerini, Aktif Görevlerini ve Canlı Konumlarını Listele (Sadece Admin)",
 )
 async def list_tenant_drivers(
     current_user: CurrentUser = Depends(require_admin),
 ) -> List[dict]:
-    return db.list_drivers(current_user.tenant_id)
+    """
+    Daveti kabul edip kayıt olmuş tüm kuryeleri listeler.
+    Her kuryeye anlık boşta/meşgul durumu, aktif sipariş sayısı ve
+    üzerindeki aktif görev listesi eklenerek döndürülür.
+    """
+    drivers = db.list_drivers(current_user.tenant_id)
+    try:
+        active_orders = db.get_admin_map_orders(current_user.tenant_id)
+    except Exception:
+        active_orders = []
+
+    orders_by_driver: Dict[str, list] = {}
+    for ord_item in active_orders:
+        if ord_item.get("status") in ("assigned", "in_transit"):
+            drv_id = str(ord_item.get("assigned_driver_id") or "")
+            if drv_id:
+                orders_by_driver.setdefault(drv_id, []).append({
+                    "id": ord_item.get("id"),
+                    "order_number": ord_item.get("order_number"),
+                    "customer_name": ord_item.get("customer_name"),
+                    "customer_phone": ord_item.get("customer_phone"),
+                    "delivery_address": ord_item.get("delivery_address"),
+                    "status": ord_item.get("status"),
+                    "dest_lat": ord_item.get("dest_lat"),
+                    "dest_lng": ord_item.get("dest_lng"),
+                })
+
+    enriched_drivers = []
+    for drv in drivers:
+        drv_dict = dict(drv)
+        drv_id = str(drv_dict.get("id") or "")
+        assigned_list = orders_by_driver.get(drv_id, [])
+        active_count = len(assigned_list)
+        is_busy = active_count > 0
+        drv_dict["active_orders_count"] = active_count
+        drv_dict["active_orders"] = assigned_list
+        drv_dict["is_busy"] = is_busy
+        drv_dict["status"] = "busy" if is_busy else "idle"
+        enriched_drivers.append(drv_dict)
+
+    return enriched_drivers
