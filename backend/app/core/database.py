@@ -716,6 +716,43 @@ class MultiTenantRepository:
             ).fetchone()
             return _normalize_row(dict(row)) if row else None
 
+    def delete_user_account(self, user_id: str, tenant_id: str, role: str) -> None:
+        """
+        Kullanıcı hesabını ve KVKK/GDPR kapsamında ilişkili tüm verilerini kalıcı olarak siler.
+        - Eğer Admin ise: İşletmeye ait tüm siparişler, konum logları, kullanıcılar ve işletme silinir.
+        - Eğer Driver ise: Sürücünün konum logları silinir, atanmış siparişler boşa çıkarılır ve kullanıcı silinir.
+        """
+        if self._supabase:
+            try:
+                if role == "admin":
+                    self._supabase.table("location_logs").delete().eq("tenant_id", tenant_id).execute()
+                    self._supabase.table("orders").delete().eq("tenant_id", tenant_id).execute()
+                    self._supabase.table("users").delete().eq("tenant_id", tenant_id).execute()
+                    self._supabase.table("tenants").delete().eq("id", tenant_id).execute()
+                else:
+                    self._supabase.table("location_logs").delete().eq("driver_id", user_id).execute()
+                    self._supabase.table("orders").update(
+                        {"assigned_driver_id": None, "status": "pending"}
+                    ).eq("assigned_driver_id", user_id).execute()
+                    self._supabase.table("users").delete().eq("id", user_id).execute()
+            except Exception as exc:
+                logger.warning("Supabase hesap silme uyarısı: %s", exc)
+
+        with self._lock, self._get_sqlite_conn() as conn:
+            if role == "admin":
+                conn.execute("DELETE FROM location_logs WHERE tenant_id = ?", (tenant_id,))
+                conn.execute("DELETE FROM orders WHERE tenant_id = ?", (tenant_id,))
+                conn.execute("DELETE FROM users WHERE tenant_id = ?", (tenant_id,))
+                conn.execute("DELETE FROM tenants WHERE id = ?", (tenant_id,))
+            else:
+                conn.execute("DELETE FROM location_logs WHERE driver_id = ?", (user_id,))
+                conn.execute(
+                    "UPDATE orders SET assigned_driver_id = NULL, status = 'pending' WHERE assigned_driver_id = ? AND status = 'assigned'",
+                    (user_id,),
+                )
+                conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+
     # -------------------------------------------------------------------------
     # 2. SİPARİŞLER, ATAMA, 24 SAATLİK HARİTA VE ZORUNLU PoD
     # -------------------------------------------------------------------------

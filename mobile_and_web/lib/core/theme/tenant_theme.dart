@@ -24,7 +24,7 @@ class TenantBranding {
   factory TenantBranding.defaultTheme() {
     return const TenantBranding(
       id: '',
-      name: 'Teslimat & PoD Yönetim Sistemi',
+      name: 'Kargo Takip PoD',
       slug: 'default',
       primaryColorHex: '#1E40AF',
       reportEmail: '',
@@ -34,7 +34,7 @@ class TenantBranding {
   factory TenantBranding.fromJson(Map<String, dynamic> json) {
     return TenantBranding(
       id: (json['id'] ?? '').toString(),
-      name: (json['name'] ?? json['tenant_name'] ?? 'Teslimat Sistemi')
+      name: (json['name'] ?? json['tenant_name'] ?? 'Kargo Takip PoD')
           .toString(),
       slug: (json['slug'] ?? '').toString(),
       logoUrl: json['logo_url']?.toString(),

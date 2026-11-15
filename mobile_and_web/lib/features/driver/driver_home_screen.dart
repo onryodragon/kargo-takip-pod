@@ -333,6 +333,71 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
+  Future<void> _showDeleteDriverAccountDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 26),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Kurye Hesabını Sil',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Kurye profiliniz, araç bilginiz ve konum geçmişiniz KVKK ve GDPR kapsamında sistemden kalıcı olarak silinecektir.\n\n'
+          'Hesabınızı silmek istediğinize emin misiniz?',
+          style: TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF334155)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Evet, Hesabımı Sil'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await widget.locationService.stopLiveTracking();
+        await widget.apiClient.deleteAccount();
+        widget.onLogout();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Hesap silinirken hata oluştu: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _openPrivacyPolicyWeb() async {
+    final base = ApiClient.baseUrl.replaceAll(RegExp(r'/api/v1/?$'), '');
+    final uri = Uri.parse('$base/privacy');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     final branding =
@@ -367,6 +432,47 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               widget.onLogout();
             },
             icon: const Icon(Icons.logout_rounded),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded),
+            tooltip: 'Hesap & Gizlilik',
+            onSelected: (val) {
+              if (val == 'privacy') {
+                _openPrivacyPolicyWeb();
+              } else if (val == 'delete') {
+                _showDeleteDriverAccountDialog();
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'privacy',
+                child: Row(
+                  children: [
+                    Icon(Icons.shield_outlined, size: 18, color: Color(0xFF475569)),
+                    SizedBox(width: 10),
+                    Text('Gizlilik Politikası (KVKK)', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_forever_rounded, size: 18, color: Color(0xFFDC2626)),
+                    SizedBox(width: 10),
+                    Text(
+                      'Hesabımı ve Verilerimi Sil',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFFDC2626),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

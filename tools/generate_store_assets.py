@@ -550,10 +550,21 @@ def export_screenshots(master_logo: Image.Image) -> None:
         ),
     ]
 
+    aliases = {
+        "01_canli_harita_ve_24_saat_arsiv.png": "01_canli_harita.png",
+        "02_surucu_filo_ve_akilli_rota.png": "02_suruculer_filo_haritasi.png",
+        "03_zorunlu_fotograf_ve_imza.png": "03_fotograf_ve_imza_pod.png",
+        "04_whatsapp_musteri_takip.png": "04_whatsapp_canli_takip.png",
+        "05_otomatik_fotografli_excel.png": "05_excel_eposta_arsiv.png",
+    }
+
     for fname, badge, title, subtitle, color, fn in items:
         img = draw_device_mockup(master_logo, badge, title, subtitle, color, fn)
         img.save(SCREENSHOTS_DIR / fname, "PNG", optimize=True)
-        print(f"  -> {fname} oluşturuldu.")
+        alias_name = aliases.get(fname)
+        if alias_name:
+            img.save(SCREENSHOTS_DIR / alias_name, "PNG", optimize=True)
+        print(f"  -> {fname} & {alias_name} oluşturuldu.")
 
 
 # ---------------------------------------------------------------------------

@@ -422,6 +422,15 @@ class ApiClient {
     return body;
   }
 
+  /// Huawei & KVKK Zorunlu: Hesabımı ve İlişkili Tüm Verileri Kalıcı Olarak Sil
+  Future<Map<String, dynamic>> deleteAccount() async {
+    final uri = Uri.parse('$baseUrl/api/v1/auth/delete-account');
+    final response = await http.delete(uri, headers: _authHeaders);
+    final data = _decodeResponse(response);
+    await logout();
+    return data;
+  }
+
   Future<Map<String, dynamic>> createDriver({
     required String fullName,
     required String email,

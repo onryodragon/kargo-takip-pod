@@ -21,7 +21,7 @@ load_dotenv(ENV_FILE_PATH)
 @dataclass
 class Settings:
     # Uygulama Bilgileri
-    APP_NAME: str = "Multi-Tenant Teslimat & PoD Yönetim API"
+    APP_NAME: str = "Kargo Takip PoD API"
     API_V1_PREFIX: str = "/api/v1"
 
     # JWT Güvenlik Ayarları

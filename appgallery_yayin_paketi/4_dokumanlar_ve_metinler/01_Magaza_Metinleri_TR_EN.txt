@@ -1,0 +1,124 @@
+================================================================================
+HUAWEI APPGALLERY CONNECT - RESMİ MAĞAZA METİNLERİ (TR & EN)
+================================================================================
+
+[1. TEMEL UYGULAMA BİLGİLERİ / BASIC APP INFORMATION]
+--------------------------------------------------------------------------------
+Uygulama Adı (TR)  : Kargo Takip PoD
+App Name (EN)      : Kargo Takip PoD
+Paket Adı (Package): com.podsystem.kargo_takip_pod
+Geliştirici        : Olkan Bayat
+Varsayılan Dil     : Türkçe (tr-TR)
+Desteklenen Diller : Türkçe (tr-TR), İngilizce (en-US)
+Kategori (Category): İş / Üretkenlik / Lojistik (Business / Productivity / Navigation)
+İçerik Derecesi    : 3+ (Tüm Yaş Grupları İçin Uygun)
+Gizlilik URL (Web) : https://kargo-takip-pod.onrender.com/privacy
+KVKK URL (Web)     : https://kargo-takip-pod.onrender.com/kvkk
+Destek E-Postası   : destek@kargotakip.com / onryodragon@users.noreply.github.com
+Telif Hakkı        : © 2026 Kargo Takip PoD - Olkan Bayat. Tüm hakları saklıdır.
+
+
+[2. KISA AÇIKLAMA / SHORT DESCRIPTION (Maks. 80 Karakter)]
+--------------------------------------------------------------------------------
+TR (68 Karakter):
+Canlı kurye takibi, fotoğraflı ve imzalı teslimat kanıtı (PoD) sistemi.
+
+EN (68 Characters):
+Real-time courier tracking, photo and signature proof of delivery PoD.
+
+
+[3. AYRINTILI TANITIM METNİ / FULL DESCRIPTION (TÜRKÇE)]
+--------------------------------------------------------------------------------
+Kargo Takip PoD; kargo, lojistik, kurye ve saha dağıtım işletmeleri için tasarlanmış yeni nesil, çok kiracılı (multi-tenant) teslimat yönetimi ve elektronik Teslimat Kanıtı (Proof of Delivery - PoD) platformudur.
+
+Google Mobil Servisleri'nden (GMS) tamamen bağımsız mimarisi sayesinde tüm Huawei akıllı telefon ve tabletlerinde sorunsuz, tam performansla çalışır.
+
+ÖNE ÇIKAN TEMEL ÖZELLİKLER:
+
+1. YÖNETİCİ PANELİ VE SÜRÜCÜLER SEKMESİ
+• Bağımsız "Sürücüler" sekmesi üzerinden sahadaki kuryeleri yönetin.
+• Tek tıkla WhatsApp üzerinden yeni kurye davetiyesi gönderin.
+• Sürücüleri "Tümü", "🟢 Boşta Olanlar" ve "🔴 Meşgul (Görevde)" filtreleriyle listeleyin.
+• Sürücüye tıklayarak doğrudan yeni görev/sipariş ataması yapın.
+• Entegre Toplu Canlı Filo Haritası ile tüm kuryelerin anlık konumunu izleyin.
+
+2. CANLI KURYE VE SİPARİŞ TAKİBİ
+• Sahadaki kuryelerin anlık konumunu harita üzerinde canlı izleyin.
+• Kurye paketi yola çıkardığında alıcı müşteriye tek kullanımlık şifreli takip linki iletilir.
+• Müşteriler ek uygulama yüklemeden tarayıcı üzerinden kuryenin varışını haritada canlı izleyebilir.
+• Gizlilik ilkesi gereği tamamlanan teslimatlar 24 saat sonra haritadan otomatik olarak arşivlenir.
+
+3. FOTOĞRAFLI VE İMZALI TESLİMAT KANITI (PoD)
+• Teslimat anında paket/koli fotoğrafı çekilerek sisteme işlenir.
+• Alıcının ıslak dijital imzası dokunmatik ekrandan saniyeler içinde alınır.
+• Fotoğraf ve imza olmadan teslimatın tamamlanmasını engelleyen zorunlu güvenlik denetimi.
+
+4. OTOMATİK FOTOĞRAFLI EXCEL ARŞİVİ
+• Teslimat tamamlandığında, çekilen teslimat fotoğrafı ve alıcı imzası doğrudan hücre içerisine gömülü biçimde profesyonel Excel (.xlsx) raporuna dönüştürülür.
+• Hazırlanan rapor işletmenin e-posta adresine anında otomatik iletilir ve yerel arşivde saklanır.
+
+5. BYOS - KENDİ SUNUCUNU BAĞLA (BRING YOUR OWN SERVER)
+• İşletmeler ister platformun varsayılan yüksek hızlı bulut altyapısını kullanabilir, ister 1 tıkla kendi bağımsız ücretsiz sunucusunu bağlayarak verilerinin tam kontrolünü sağlayabilir.
+
+6. HESAP VE VERİ SİLME HAKKI (KVKK & GDPR)
+• Kullanıcılar diledikleri zaman profil/ayarlar ekranından "Hesabımı ve Tüm Verilerimi Kalıcı Olarak Sil" butonunu kullanarak hesaplarını ve toplanan tüm verilerini tek tıkla silebilirler.
+
+
+[4. FULL DESCRIPTION (ENGLISH)]
+--------------------------------------------------------------------------------
+Kargo Takip PoD is an enterprise multi-tenant delivery management and electronic Proof of Delivery (PoD) solution engineered specifically for courier companies, logistics providers, and on-demand delivery fleets.
+
+Fully optimized and independent from Google Mobile Services (GMS-free), ensuring reliable operation across all Huawei EMUI and HarmonyOS smartphones and tablets.
+
+KEY HIGHLIGHTS:
+
+1. DEDICATED DRIVERS TAB & FLEET RADAR
+• Dedicated "Drivers" management tab for fleet dispatchers.
+• One-tap courier recruitment invitations via WhatsApp.
+• Real-time driver status filters: "All", "🟢 Available / Idle", and "🔴 On Duty / Busy".
+• Tap any courier to instantly allocate new delivery stops.
+• High-performance interactive map tracking all active couriers simultaneously.
+
+2. REAL-TIME COURIER TRACKING
+• Real-time GPS location telemetry visualized on interactive vector maps.
+• Automatic instant tracking links shared with recipients via SMS / WhatsApp upon dispatch.
+• Customers track the driver's approach in real-time via their web browser without installing any app.
+• 24-hour privacy archiving policy automatically unlists completed routes.
+
+3. PHOTO & SIGNATURE PROOF OF DELIVERY (PoD)
+• Doorstep parcel photo verification.
+• Touchscreen digital signature capture from the recipient.
+• Strict server-level validation preventing closure without verifiable PoD.
+
+4. EMBEDDED EXCEL REPORTS WITH IMAGES
+• Automatic compilation of delivery photos and signatures directly embedded into professional Excel (.xlsx) spreadsheets.
+• Instant automated email dispatch to the enterprise tenant upon delivery completion.
+
+5. COMPLETE DATA & ACCOUNT DELETION (GDPR & PRIVACY)
+• Transparent "Delete Account & Data" action allowing users and tenants to permanently wipe all stored telemetry and personal data at any time.
+
+
+[5. SÜRÜM NOTLARI / RELEASE NOTES (v1.0.0)]
+--------------------------------------------------------------------------------
+TR:
+• İlk resmi Huawei AppGallery sürümü!
+• Bağımsız "Sürücüler & Filo" sekmesi ve toplu kurye haritası.
+• İlk açılışta zorunlu Gizlilik Politikası ve KVKK onay penceresi.
+• GMS'ten bağımsız canlı GPS takip motoru ve akıllı rota optimizasyonu.
+• Fotoğraflı ve imzalı zorunlu teslimat kanıtı (PoD).
+• Hücre içi fotoğraf gömülü Excel (.xlsx) e-posta raporlama.
+• Tek tıkla hesap ve tüm verileri kalıcı silme seçeneği.
+
+EN:
+• Official debut release on Huawei AppGallery!
+• Dedicated "Drivers & Fleet" management tab with collective live map.
+• First-launch Privacy Policy consent gate.
+• GMS-independent real-time GPS tracking and route optimization.
+• Mandatory photo and signature capture for electronic Proof of Delivery.
+• Automated Excel (.xlsx) reporting with embedded photos and signatures.
+• One-tap permanent account and data deletion in full compliance with GDPR.
+
+
+[6. ANAHTAR KELİMELER / KEYWORDS (Virgülle Ayrılmış)]
+--------------------------------------------------------------------------------
+kargo takip pod, kurye, teslimat, pod, proof of delivery, canlı takip, lojistik, filo yönetimi, koli, paket, imza, excel rapor, courier tracking, delivery, logistics

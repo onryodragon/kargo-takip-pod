@@ -9,7 +9,7 @@ veya inceleme notu alanına doğrudan yapıştırılmak üzere hazırlanmıştı
 --------------------------------------------------------------------------------
 
 [TÜRKÇE GEREKÇE BEYANI]:
-"Kargo Takip & Canlı Kurye POD, kargo ve lojistik firmaları için saha teslimat yönetim uygulamasıdır. 
+"Kargo Takip PoD, kargo ve lojistik firmaları için saha teslimat yönetim uygulamasıdır. 
 ACCESS_BACKGROUND_LOCATION izni, yalnızca kurye rolündeki kullanıcı bir teslimatı 'Yolda' (in_transit) durumuna aldığında kullanılır. Kurye seyir halindeyken cihaz ekranını kapatsa veya navigasyon haritasına geçse dahi, paketi bekleyen müşterinin SMS/WhatsApp ile kendisine gönderilen güvenli web linki üzerinden kuryenin varışını harita üzerinde canlı takip edebilmesi ve acil durumlarda filo güvenliğinin sağlanabilmesi için periyodik GPS koordinatları sunucuya iletilir.
 Teslimat tamamlandığında veya kurye vardiyasını sonlandırdığında konum iletimi anında durdurulur. 
 Bu izin son alıcılardan veya yöneticilerden kesinlikle talep edilmez; yalnızca sahada aktif kurye olarak görev yapan sürücülerden açık rızaları alınarak talep edilir. Toplanan konum verileri üçüncü şahıslara veya reklam ağlarına kesinlikle satılmaz."

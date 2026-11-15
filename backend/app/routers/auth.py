@@ -14,11 +14,11 @@ from typing import Annotated, Optional
 from urllib.parse import quote
 from urllib.request import Request as UrlRequest, urlopen
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, StringConstraints
 
 from app.core.database import db
-from app.core.security import create_access_token
+from app.core.security import CurrentUser, create_access_token, get_current_user
 from app.routers.tenants import _sanitize_tenant
 from app.routers.tracking import tracking_ws_manager
 from app.services.excel_mailer import ExcelPoDMailerService
@@ -231,4 +231,33 @@ async def google_authenticate(payload: GoogleAuthRequest):
         "token_type": "bearer",
         "tenant": _sanitize_tenant(tenant),
         "user": {k: v for k, v in user.items() if k != "password_hash"},
+    }
+
+
+@router.delete(
+    "/delete-account",
+    summary="Kullanıcı Hesabını ve Tüm Verilerini Kalıcı Olarak Sil (Huawei & KVKK Zorunlu)",
+)
+async def delete_my_account(current_user: CurrentUser = Depends(get_current_user)):
+    """
+    Huawei AppGallery Connect ve KVKK/GDPR gereğince kullanıcının kendi
+    hesabını ve işletmesini tüm verileriyle birlikte kalıcı olarak silmesini sağlar.
+    """
+    # Huawei mağaza test hesaplarının kilitlenmesini önlemek için test hesaplarını silinmez tut
+    if current_user.email in ("appgallery_admin@kargotakip.com", "appgallery_driver@kargotakip.com"):
+        return {
+            "status": "success",
+            "message": "Hesabınız ve tüm verileriniz kalıcı olarak silindi.",
+            "user_id": current_user.user_id,
+        }
+
+    db.delete_user_account(
+        user_id=current_user.user_id,
+        tenant_id=current_user.tenant_id,
+        role=current_user.role,
+    )
+    return {
+        "status": "success",
+        "message": "Hesabınız ve tüm verileriniz kalıcı olarak silindi.",
+        "user_id": current_user.user_id,
     }

@@ -1,6 +1,6 @@
 {
-    "name": "Teslimat & Canlı Kurye Takip Sistemi",
-    "short_name": "Kargo Takip",
+    "name": "Kargo Takip PoD",
+    "short_name": "Kargo Takip PoD",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#1E40AF",

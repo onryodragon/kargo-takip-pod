@@ -393,19 +393,32 @@ PRIVACY_POLICY_HTML = """<!DOCTYPE html>
                 </div>
 
                 <h2>1. Veri Sorumlusu ve Hizmet Tanımı</h2>
-                <p>Kargo Takip POD platformu, işletmelerin sipariş ve teslimat süreçlerini yönetmelerini, kuryelerin paket teslimatlarını fotoğraflı ve imzalı olarak kanıtlamalarını (Proof of Delivery), müşterilerin ise kendilerine iletilen şifreli geçici link üzerinden kuryenin varışını haritada canlı izlemelerini sağlayan çok kiracılı (multi-tenant) bir kurumsal yazılım çözümüdür.</p>
+                <p><strong>Uygulama Adı:</strong> Kargo Takip PoD<br>
+                <strong>Geliştirici ve Veri Sorumlusu:</strong> Olkan Bayat<br>
+                <strong>İletişim ve Veri Silme Talebi E-Postası:</strong> <a href="mailto:destek@kargotakip.com">destek@kargotakip.com</a> / <a href="mailto:onryodragon@users.noreply.github.com">onryodragon@users.noreply.github.com</a></p>
+                <p>Kargo Takip PoD platformu, işletmelerin sipariş ve teslimat süreçlerini yönetmelerini, kuryelerin paket teslimatlarını fotoğraflı ve imzalı olarak kanıtlamalarını (Proof of Delivery), müşterilerin ise kendilerine iletilen şifreli geçici link üzerinden kuryenin varışını haritada canlı izlemelerini sağlayan çok kiracılı (multi-tenant) bir kurumsal yazılım çözümüdür.</p>
 
-                <h2>2. İstenen Hassas Cihaz İzinleri ve Kullanım Amaçları</h2>
-                <p>Uygulamamız yalnızca temel lojistik işlevlerini yerine getirmek amacıyla aşağıdaki hassas sistem izinlerini talep eder. Verileriniz hiçbir reklam, pazarlama veya üçüncü şahıs veri tüccarı ile paylaşılmaz:</p>
+                <h2>2. Toplanan Veriler ve Kullanım Amaçları</h2>
+                <p>Uygulamamız yalnızca temel lojistik işlevlerini yerine getirmek amacıyla aşağıdaki verileri ve hassas sistem izinlerini talep eder. Verileriniz hiçbir reklam, pazarlama veya üçüncü şahıs veri tüccarı ile paylaşılmaz:</p>
 
                 <div class="perm-card">
-                    <div class="perm-title">📷 Kamera İzni <span class="perm-code">android.permission.CAMERA</span></div>
-                    <p><strong>Amaç:</strong> Yalnızca kurye paketi alıcıya teslim ettiği anda koli/paket teslim durumunun fotoğraflanması ve dijital tutanağa/Excel raporuna eklenmesi amacıyla kullanılır. Kurye kamerayı teslimat onay ekranında bizzat açar; uygulama arka planda veya habersizce asla kamera kaydı almaz ya da kullanıcının cihazındaki fotoğraf galerisini taramaz.</p>
+                    <div class="perm-title">📍 Hassas ve Arka Plan Konum İzni <span class="perm-code">android.permission.ACCESS_BACKGROUND_LOCATION & ACCESS_FINE_LOCATION</span></div>
+                    <p><strong>Amaç:</strong> Saha kuryesi bir siparişi teslimata çıkardığında (Durum: "Yolda / in_transit"), müşterinin SMS/WhatsApp ile kendisine iletilen geçici takip linki üzerinden kuryenin yaklaşmakta olduğunu haritada canlı olarak görebilmesi ve işletme yöneticisinin kurye rotasını optimize edebilmesi için gereklidir. Kurye uygulamayı alta aldığında veya ekran kapalıyken GPS sinyalinin kesilmemesi için arka plan konum erişimi kullanılır. Teslimat tamamlandığında veya kurye vardiyasını sonlandırdığında konum iletimi anında durdurulur.</p>
                 </div>
 
                 <div class="perm-card">
-                    <div class="perm-title">📍 Canlı ve Arka Plan Konum İzni <span class="perm-code">android.permission.ACCESS_BACKGROUND_LOCATION</span></div>
-                    <p><strong>Amaç:</strong> Saha kuryesi bir siparişi teslimata çıkardığında (Durum: "Yolda / in_transit"), müşterinin SMS/WhatsApp ile kendisine iletilen geçici takip linki üzerinden kuryenin yaklaşmakta olduğunu haritada canlı olarak görebilmesi ve işletme yöneticisinin filo güvenliğini izleyebilmesi için gereklidir. Kurye uygulamayı alta aldığında veya ekran kapalıyken GPS sinyalinin kesilmemesi için arka plan konum erişimi kullanılır. Teslimat tamamlandığında veya kurye vardiyasını sonlandırdığında konum iletimi anında durdurulur. Müşterilerden veya yöneticilerden arka plan konum izni istenmez.</p>
+                    <div class="perm-title">📷 Kamera İzni <span class="perm-code">android.permission.CAMERA</span></div>
+                    <p><strong>Amaç:</strong> Yalnızca kurye paketi alıcıya teslim ettiği anda koli/paket teslim durumunun fotoğraflanması ve dijital tutanağa/Excel raporuna Teslimat Kanıtı (PoD) olarak eklenmesi amacıyla kullanılır. Kurye kamerayı teslimat onay ekranında bizzat açar; uygulama arka planda veya habersizce asla kamera kaydı almaz ya da kullanıcının cihazındaki fotoğraf galerisini taramaz.</p>
+                </div>
+
+                <div class="perm-card">
+                    <div class="perm-title">✍️ Ekrana İmza Alma</div>
+                    <p><strong>Amaç:</strong> Teslimat anında alıcının dokunmatik ekran üzerinden ıslak imzasını alarak teslimatı onayladığını belgelemek ve teslim tutanağına eklemek için kullanılır.</p>
+                </div>
+
+                <div class="perm-card">
+                    <div class="perm-title">📱 Telefon Numarası</div>
+                    <p><strong>Amaç:</strong> Alıcı müşteriye sipariş takip linkinin WhatsApp/SMS ile iletilmesi ve sahada görev yapacak kuryelerin WhatsApp üzerinden davet edilerek işletmeye bağlanması amacıyla kullanılır.</p>
                 </div>
 
                 <div class="perm-card">
@@ -441,19 +454,32 @@ PRIVACY_POLICY_HTML = """<!DOCTYPE html>
                 </div>
 
                 <h2>1. Data Controller & Service Overview</h2>
+                <p><strong>App Name:</strong> Kargo Takip PoD<br>
+                <strong>Developer & Data Controller:</strong> Olkan Bayat<br>
+                <strong>Contact & Account/Data Deletion Email:</strong> <a href="mailto:destek@kargotakip.com">destek@kargotakip.com</a> / <a href="mailto:onryodragon@users.noreply.github.com">onryodragon@users.noreply.github.com</a></p>
                 <p>Kargo Takip PoD is a multi-tenant cloud delivery management solution providing real-time driver tracking, electronic Proof of Delivery (PoD with photos and recipient signatures), and temporary live map tracking for customers receiving goods.</p>
 
                 <h2>2. Sensitive Permissions & Legitimate Use Cases</h2>
                 <p>Our application requests only the minimal necessary permissions strictly required to execute core logistics operations. We do not monetize, sell, or share user data with third-party advertising networks:</p>
 
                 <div class="perm-card">
-                    <div class="perm-title">📷 Camera Permission <span class="perm-code">android.permission.CAMERA</span></div>
-                    <p><strong>Purpose:</strong> Strictly utilized when a courier physically delivers a parcel to take a delivery photo as Proof of Delivery (PoD). The camera is explicitly opened by the driver on the delivery confirmation screen. The application never scans your device gallery or captures photos silently in the background.</p>
+                    <div class="perm-title">📍 Live & Background Location <span class="perm-code">android.permission.ACCESS_BACKGROUND_LOCATION & ACCESS_FINE_LOCATION</span></div>
+                    <p><strong>Purpose:</strong> Required exclusively for field couriers while an order is actively out for delivery ("in_transit"). It streams real-time GPS coordinates so waiting customers can track the driver's approach via a temporary secure web link, and fleet dispatchers can optimize delivery routes. Tracking stops immediately upon delivery completion or driver sign-off.</p>
                 </div>
 
                 <div class="perm-card">
-                    <div class="perm-title">📍 Live & Background Location <span class="perm-code">android.permission.ACCESS_BACKGROUND_LOCATION</span></div>
-                    <p><strong>Purpose:</strong> Required exclusively for field couriers while an order is actively out for delivery ("in_transit"). It streams real-time GPS coordinates so waiting customers can track the driver's arrival via a temporary secure web link, and fleet dispatchers can ensure driver safety. Tracking stops immediately upon delivery completion or driver sign-off. Background location is never requested from customers or dispatchers.</p>
+                    <div class="perm-title">📷 Camera Permission <span class="perm-code">android.permission.CAMERA</span></div>
+                    <p><strong>Purpose:</strong> Strictly utilized when a courier physically delivers a parcel to capture a delivery photo as Proof of Delivery (PoD). The camera is explicitly opened by the driver on the delivery confirmation screen. The application never scans your device gallery or captures photos silently in the background.</p>
+                </div>
+
+                <div class="perm-card">
+                    <div class="perm-title">✍️ On-Screen Signature Capture</div>
+                    <p><strong>Purpose:</strong> Used exclusively to record the recipient's digital touchscreen signature confirming proof of receipt.</p>
+                </div>
+
+                <div class="perm-card">
+                    <div class="perm-title">📱 Phone Number</div>
+                    <p><strong>Purpose:</strong> Used to dispatch real-time web tracking links to customers via WhatsApp/SMS and onboard fleet drivers via one-tap WhatsApp invitations.</p>
                 </div>
 
                 <div class="perm-card">

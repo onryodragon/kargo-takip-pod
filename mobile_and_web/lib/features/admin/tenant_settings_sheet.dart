@@ -100,6 +100,66 @@ class _TenantSettingsSheetState extends State<TenantSettingsSheet> {
     }
   }
 
+  Future<void> _showDeleteAccountConfirmDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 26),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Hesap ve Verileri Sil',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Bu işlem geri alınamaz!\n\n'
+          'Hesabınız, işletmeniz, kurye listeleriniz, siparişleriniz, teslimat fotoğrafları ve canlı konum kayıtlarınız KVKK ve GDPR kapsamında sistemden kalıcı olarak silinecektir.\n\n'
+          'Devam etmek istediğinize emin misiniz?',
+          style: TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF334155)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Evet, Kalıcı Olarak Sil'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await widget.apiClient.deleteAccount();
+        if (mounted) {
+          Navigator.of(context).pop(); // bottom sheet kapat
+          widget.onUpdated();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Hesap silinirken hata oluştu: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -339,6 +399,23 @@ class _TenantSettingsSheetState extends State<TenantSettingsSheet> {
                               ],
                             ),
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      OutlinedButton.icon(
+                        onPressed: _showDeleteAccountConfirmDialog,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFDC2626),
+                          side: const BorderSide(color: Color(0xFFFCA5A5)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(Icons.delete_forever_rounded, size: 20),
+                        label: const Text(
+                          'Hesabımı ve Tüm Verilerimi Kalıcı Olarak Sil',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
                         ),
                       ),
                     ],

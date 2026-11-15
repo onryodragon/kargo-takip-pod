@@ -6,6 +6,7 @@ import 'core/api/api_client.dart';
 import 'core/services/location_service.dart';
 import 'core/theme/tenant_theme.dart';
 import 'core/widgets/animated_saas_widgets.dart';
+import 'core/widgets/first_launch_privacy_gate.dart';
 import 'features/admin/admin_dashboard_screen.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/auth/driver_invite_register_screen.dart';
@@ -234,11 +235,13 @@ class _MultiTenantDeliveryAppState extends State<MultiTenantDeliveryApp> {
               settings: routeSettings,
             );
           },
-          home: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 380),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            child: _buildHomeScreen(),
+          home: FirstLaunchPrivacyGate(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 380),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: _buildHomeScreen(),
+            ),
           ),
         );
       },
