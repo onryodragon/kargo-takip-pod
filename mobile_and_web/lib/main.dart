@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/api/api_client.dart';
 import 'core/services/location_service.dart';
@@ -20,6 +22,18 @@ void main() async {
   if (initialApiUrl != null &&
       (initialApiUrl.startsWith('http://') || initialApiUrl.startsWith('https://'))) {
     await ApiClient.setCustomBaseUrl(initialApiUrl);
+  } else if (kIsWeb) {
+    // Web ortamında işletmenin kendi Render/özel sunucusundan açılıyorsa origin'i otomatik eşle
+    final origin = Uri.base.origin;
+    if (origin.startsWith('http://') || origin.startsWith('https://')) {
+      if (!origin.contains('localhost') && !origin.contains('127.0.0.1')) {
+        final prefs = await SharedPreferences.getInstance();
+        final savedUrl = prefs.getString('custom_api_base_url');
+        if (savedUrl == null || savedUrl.isEmpty) {
+          await ApiClient.setCustomBaseUrl(origin);
+        }
+      }
+    }
   }
 
   final themeController = TenantThemeController();

@@ -45,7 +45,8 @@ class WhatsAppHelper {
             : baseWebUrl)
         .replaceAll(RegExp(r'/+$'), '');
     final cleanOrderNo = orderNumber.trim().replaceFirst(RegExp(r'^#+'), '');
-    final trackingUrl = '$cleanBase/#/track/${trackingToken.trim()}';
+    final trackingUrl =
+        '$cleanBase/#/track/${trackingToken.trim()}?api=${Uri.encodeComponent(cleanBase)}';
 
     return 'Merhaba ${customerName.trim()}, '
         '*${tenantName.trim()}* siparişiniz (#$cleanOrderNo) yola çıktı! '
