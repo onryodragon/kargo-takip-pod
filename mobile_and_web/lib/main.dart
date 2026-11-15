@@ -15,6 +15,13 @@ import 'features/driver/driver_permission_gate.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // URL üzerinden gelen özel işletme sunucu adresi (?api=https://... veya ?server=https://...)
+  final initialApiUrl = _extractApiUrlFromUri(Uri.base);
+  if (initialApiUrl != null &&
+      (initialApiUrl.startsWith('http://') || initialApiUrl.startsWith('https://'))) {
+    await ApiClient.setCustomBaseUrl(initialApiUrl);
+  }
+
   final themeController = TenantThemeController();
   final apiClient = ApiClient(themeController: themeController);
   final locationService = GmsFreeLocationService(apiClient: apiClient);
@@ -34,6 +41,25 @@ void main() async {
       initialDriverInviteToken: initialDriverInviteToken,
     ),
   );
+}
+
+/// Web URL'sinden (`?api=https://...` veya `?server=https://...`)
+/// işletmenin özel sunucu adresini yakalar.
+String? _extractApiUrlFromUri(Uri uri) {
+  final queryApi = uri.queryParameters['api'] ?? uri.queryParameters['server'];
+  if (queryApi != null && queryApi.trim().isNotEmpty) {
+    return queryApi.trim();
+  }
+  if (uri.fragment.isNotEmpty) {
+    final fragUri = Uri.tryParse(uri.fragment);
+    if (fragUri != null) {
+      final fragApi = fragUri.queryParameters['api'] ?? fragUri.queryParameters['server'];
+      if (fragApi != null && fragApi.trim().isNotEmpty) {
+        return fragApi.trim();
+      }
+    }
+  }
+  return null;
 }
 
 /// Web URL'sinden (`/track/TOKEN`, `#/track/TOKEN` veya `?track=TOKEN`)

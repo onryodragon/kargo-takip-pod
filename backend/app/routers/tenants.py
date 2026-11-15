@@ -252,7 +252,7 @@ async def create_driver_whatsapp_invite(
     )
     tenant = db.get_tenant_by_id(current_user.tenant_id)
     base_url = settings.PUBLIC_BASE_URL.rstrip("/")
-    invite_url = f"{base_url}/#/driver-invite/{invite['invite_token']}"
+    invite_url = f"{base_url}/#/driver-invite/{invite['invite_token']}?api={base_url}"
     return {
         **invite,
         "tenant_name": tenant["name"],

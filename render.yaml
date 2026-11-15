@@ -10,10 +10,6 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.7"
-      - key: PUBLIC_BASE_URL
-        value: "https://kargo-takip-pod.onrender.com"
-      - key: PUBLIC_TRACKING_WEB_URL
-        value: "https://kargo-takip-pod.onrender.com/#/track"
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: JWT_ALGORITHM
@@ -29,9 +25,9 @@ services:
       - key: SMTP_USE_TLS
         value: "true"
       - key: SMTP_USER
-        value: "GONDERICI_GMAIL_ADRESIN@gmail.com"
+        sync: false
       - key: SMTP_PASSWORD
-        value: "16_HANELI_UYGULAMA_SIFREN"
+        sync: false
       - key: SMTP_FALLBACK_PORTS
         value: "465,587,2525"
       - key: EMAIL_DELIVERY_ORDER

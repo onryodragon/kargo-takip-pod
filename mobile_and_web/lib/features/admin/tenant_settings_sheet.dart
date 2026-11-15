@@ -142,8 +142,9 @@ class _TenantSettingsSheetState extends State<TenantSettingsSheet>
     try {
       final res = await widget.apiClient.createDriverInvite(rawPhone);
       final token = res['invite_token']?.toString() ?? '';
-      final inviteUrl = res['invite_url']?.toString() ??
-          '${ApiClient.baseWebUrl}/#/driver-invite/$token';
+      final currentBase = ApiClient.baseUrl;
+      final inviteUrl =
+          '$currentBase/#/driver-invite/$token?api=${Uri.encodeComponent(currentBase)}';
 
       setState(() {
         _lastGeneratedInviteUrl = inviteUrl;

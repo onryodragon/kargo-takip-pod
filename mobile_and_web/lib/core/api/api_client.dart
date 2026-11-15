@@ -38,6 +38,48 @@ class ApiClient {
 
   static String? get customBaseUrl => _customBaseUrl;
 
+  /// WebSocket URL'si: API baseUrl'ine göre dinamik olarak ws:// veya wss:// üretir.
+  static String get wsBaseUrl {
+    final base = baseUrl;
+    if (base.startsWith('https://')) {
+      return 'wss://${base.substring(8)}';
+    } else if (base.startsWith('http://')) {
+      return 'ws://${base.substring(7)}';
+    }
+    return defaultWsBaseUrl;
+  }
+
+  /// Sunucu /api/v1/health uç noktasını sorgulayarak sunucunun ayakta ve sağlıklı
+  /// olduğunu test eder (8 saniyelik zaman aşımı koruması).
+  static Future<Map<String, dynamic>> validateServerHealth(String url) async {
+    final cleaned = url.trim().replaceAll(RegExp(r'/+$'), '');
+    if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+      throw Exception('Adres "https://" veya "http://" ile başlamalıdır.');
+    }
+    final healthUri = Uri.parse('$cleaned/api/v1/health');
+    try {
+      final response = await http
+          .get(healthUri)
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map<String, dynamic> && data['status'] == 'healthy') {
+          return {
+            'success': true,
+            'url': cleaned,
+            'data': data,
+          };
+        }
+      }
+      throw Exception(
+        'Sunucu yanıt verdi ancak sağlık durumu onaylanamadı (HTTP ${response.statusCode}).',
+      );
+    } catch (e) {
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      throw Exception('Sunucuya erişilemedi: $msg');
+    }
+  }
+
   static Future<void> setCustomBaseUrl(String url) async {
     final cleaned = url.trim().replaceAll(RegExp(r'/+$'), '');
     _customBaseUrl = cleaned.isEmpty ? null : cleaned;

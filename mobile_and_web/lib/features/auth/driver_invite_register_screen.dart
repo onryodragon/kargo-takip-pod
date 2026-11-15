@@ -78,6 +78,25 @@ class _DriverInviteRegisterScreenState
   }
 
   Future<void> _loadInviteDetails(String rawToken) async {
+    final trimmed = rawToken.trim();
+    // Eğer bağlantı veya token içinde ?api= veya ?server= varsa, sunucuyu kurye için otomatik ayarla
+    String? apiParam;
+    final uri = Uri.tryParse(trimmed);
+    if (uri != null && uri.hasQuery) {
+      apiParam = uri.queryParameters['api'] ?? uri.queryParameters['server'];
+    }
+    if (apiParam == null && trimmed.contains('?api=')) {
+      apiParam = trimmed.split('?api=').last.split('&').first.trim();
+      apiParam = Uri.decodeComponent(apiParam);
+    } else if (apiParam == null && trimmed.contains('&api=')) {
+      apiParam = trimmed.split('&api=').last.split('&').first.trim();
+      apiParam = Uri.decodeComponent(apiParam);
+    }
+    if (apiParam != null &&
+        (apiParam.startsWith('http://') || apiParam.startsWith('https://'))) {
+      await ApiClient.setCustomBaseUrl(apiParam);
+    }
+
     final token = _extractCleanToken(rawToken);
     if (token.isEmpty) return;
 

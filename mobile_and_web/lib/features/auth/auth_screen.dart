@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/widgets/animated_saas_widgets.dart';
@@ -289,7 +290,10 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _openServerConfigDialog() async {
     final serverUrlCtrl = TextEditingController(text: ApiClient.baseUrl);
+    bool isChecking = false;
+    String? checkError;
     final messenger = ScaffoldMessenger.of(context);
+
     await showDialog(
       context: context,
       builder: (dialogCtx) {
@@ -306,7 +310,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Sunucu Bağlantı Ayarı (BYOS)',
+                      'İşletme Sunucu Bağlantısı (BYOS)',
                       style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -362,7 +366,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SizedBox(height: 12),
                     const Text(
                       'Uygulama varsayılan olarak ortak ücretsiz Render bulut sunucusunu (https://kargo-takip-pod.onrender.com) kullanır.\n\n'
-                      'Kendi bağımsız Render, VPS veya şirket içi sunucusunu kuran işletmeler, API adresini buraya girerek tüm kargo takip ve teslimat altyapısını kendi sunucularına bağlayabilir.',
+                      'Kendi bağımsız Render veya VPS sunucusunu kuran işletmeler, API adresini buraya girerek tüm kargo takip ve teslimat altyapısını kendi sunucularına bağlayabilir.',
                       style: TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
                     ),
                     const SizedBox(height: 14),
@@ -370,13 +374,24 @@ class _AuthScreenState extends State<AuthScreen> {
                       controller: serverUrlCtrl,
                       keyboardType: TextInputType.url,
                       decoration: const InputDecoration(
-                        labelText: 'Sunucu API URL Adresi',
-                        hintText: 'https://sunucu-adresiniz.onrender.com',
+                        labelText: 'İşletme Sunucu API URL Adresi',
+                        hintText: 'https://sirket-adi.onrender.com',
                         prefixIcon: Icon(Icons.link_rounded),
                         border: OutlineInputBorder(),
                         helperText: 'Örn: https://kargo-takip-pod.onrender.com',
                       ),
                     ),
+                    if (checkError != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        checkError!,
+                        style: const TextStyle(
+                          color: Color(0xFFDC2626),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -408,44 +423,299 @@ class _AuthScreenState extends State<AuthScreen> {
                   child: const Text('İptal'),
                 ),
                 ElevatedButton(
-                  onPressed: () async {
-                    final entered = serverUrlCtrl.text.trim();
-                    if (entered.isEmpty) {
-                      await ApiClient.setCustomBaseUrl('');
-                    } else {
-                      if (!entered.startsWith('http://') &&
-                          !entered.startsWith('https://')) {
-                        messenger.showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Geçersiz URL! Adres "https://" veya "http://" ile başlamalıdır.',
-                            ),
-                            backgroundColor: Color(0xFFDC2626),
-                          ),
-                        );
-                        return;
-                      }
-                      await ApiClient.setCustomBaseUrl(entered);
-                    }
-                    if (!dialogCtx.mounted) return;
-                    Navigator.of(dialogCtx).pop();
-                    if (mounted) setState(() {});
-                    messenger.showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Sunucu adresi başarıyla güncellendi: ${ApiClient.baseUrl}',
-                        ),
-                        backgroundColor: const Color(0xFF16A34A),
-                      ),
-                    );
-                  },
-                  child: const Text('Kaydet ve Bağlan'),
+                  onPressed: isChecking
+                      ? null
+                      : () async {
+                          final entered = serverUrlCtrl.text.trim();
+                          if (entered.isEmpty) {
+                            await ApiClient.setCustomBaseUrl('');
+                            if (!dialogCtx.mounted) return;
+                            Navigator.of(dialogCtx).pop();
+                            if (mounted) setState(() {});
+                            return;
+                          }
+                          setDialogState(() {
+                            isChecking = true;
+                            checkError = null;
+                          });
+                          try {
+                            await ApiClient.validateServerHealth(entered);
+                            await ApiClient.setCustomBaseUrl(entered);
+                            if (!dialogCtx.mounted) return;
+                            Navigator.of(dialogCtx).pop();
+                            if (mounted) setState(() {});
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Sunucu doğrulandı ve başarıyla bağlandı: ${ApiClient.baseUrl}',
+                                ),
+                                backgroundColor: const Color(0xFF16A34A),
+                              ),
+                            );
+                          } catch (err) {
+                            setDialogState(() {
+                              isChecking = false;
+                              checkError = err.toString().replaceFirst('Exception: ', '');
+                            });
+                          }
+                        },
+                  child: isChecking
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Doğrula ve Bağlan'),
                 ),
               ],
             );
           },
         );
       },
+    );
+  }
+
+  Future<void> _openOneClickDeployWizard() async {
+    const deployUrl =
+        'https://render.com/deploy?repo=https://github.com/onryodragon/kargo-takip-pod';
+    final serverUrlCtrl = TextEditingController();
+    bool isVerifying = false;
+    String? verifyError;
+    final messenger = ScaffoldMessenger.of(context);
+
+    await showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setWizardState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Row(
+                children: [
+                  Icon(Icons.rocket_launch_rounded, color: Color(0xFF2563EB), size: 26),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '1 Tıkla Kendi Ücretsiz Sunucunu Kur',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF93C5FD)),
+                        ),
+                        child: const Text(
+                          'Tüm kargo, kurye, konum ve müşteri verilerinizin %100 size ait olması için kendi ücretsiz Render bulut sunucunuzu 1 dakikada kurabilirsiniz.',
+                          style: TextStyle(fontSize: 12.5, color: Color(0xFF1E3A8A), height: 1.35),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Adım 1 & 2
+                      _buildWizardStep(
+                        number: '1',
+                        title: 'Render Kurulumunu Başlatın',
+                        subtitle:
+                            'Aşağıdaki butona bastığınızda Render.com otomatik kurulum sayfası açılacaktır. "Apply / Deploy Blueprint" butonuna basarak sunucunuzu oluşturun.',
+                        action: ElevatedButton.icon(
+                          onPressed: () async {
+                            final uri = Uri.parse(deployUrl);
+                            try {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            } catch (_) {}
+                          },
+                          icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                          label: const Text('Render Otomatik Kurulumunu Başlat 🌐'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Adım 3
+                      _buildWizardStep(
+                        number: '2',
+                        title: 'Sunucu Adresinizi Yapıştırın ve Bağlanın',
+                        subtitle:
+                            'Render panelinde "Live" durumuna geçen sunucunuzun web adresini (Örn: https://sirket-kargo.onrender.com) buraya yapıştırın:',
+                        action: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TextField(
+                              controller: serverUrlCtrl,
+                              keyboardType: TextInputType.url,
+                              decoration: const InputDecoration(
+                                labelText: 'İşletme Sunucu Adresi (URL)',
+                                hintText: 'https://sirket-adi.onrender.com',
+                                prefixIcon: Icon(Icons.link_rounded),
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                            ),
+                            if (verifyError != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                verifyError!,
+                                style: const TextStyle(
+                                  color: Color(0xFFDC2626),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 10),
+                            ElevatedButton.icon(
+                              onPressed: isVerifying
+                                  ? null
+                                  : () async {
+                                      final rawUrl = serverUrlCtrl.text.trim();
+                                      if (rawUrl.isEmpty) {
+                                        setWizardState(() {
+                                          verifyError = 'Lütfen geçerli bir sunucu adresi girin.';
+                                        });
+                                        return;
+                                      }
+                                      setWizardState(() {
+                                        isVerifying = true;
+                                        verifyError = null;
+                                      });
+                                      try {
+                                        await ApiClient.validateServerHealth(rawUrl);
+                                        await ApiClient.setCustomBaseUrl(rawUrl);
+                                        if (!dialogCtx.mounted) return;
+                                        Navigator.of(dialogCtx).pop();
+                                        if (mounted) setState(() {});
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Tebrikler! Özel sunucunuza başarıyla bağlanıldı: ${ApiClient.baseUrl}',
+                                            ),
+                                            backgroundColor: const Color(0xFF16A34A),
+                                          ),
+                                        );
+                                      } catch (err) {
+                                        setWizardState(() {
+                                          verifyError = err.toString().replaceFirst('Exception: ', '');
+                                          isVerifying = false;
+                                        });
+                                      }
+                                    },
+                              icon: isVerifying
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(Icons.verified_rounded, size: 18),
+                              label: Text(isVerifying ? 'Sunucu Doğrulanıyor...' : 'Doğrula ve Sunucuya Bağlan ⚡'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF16A34A),
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Kapat'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildWizardStep({
+    required String number,
+    required String title,
+    required String subtitle,
+    required Widget action,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF2563EB),
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  number,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
+          ),
+          const SizedBox(height: 10),
+          action,
+        ],
+      ),
     );
   }
 
@@ -520,6 +790,169 @@ class _AuthScreenState extends State<AuthScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // -------------------------------------------------------------
+                    // BYOS: İŞLETME SUNUCUSU BAĞLANTISI VE 1-TIKLA KURULUM KARTI
+                    // -------------------------------------------------------------
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: ApiClient.isUsingCustomBaseUrl
+                            ? const Color(0xFFFEF3C7)
+                            : Colors.white.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: ApiClient.isUsingCustomBaseUrl
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFFCBD5E1),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                ApiClient.isUsingCustomBaseUrl
+                                    ? Icons.dns_rounded
+                                    : Icons.cloud_done_rounded,
+                                size: 20,
+                                color: ApiClient.isUsingCustomBaseUrl
+                                    ? const Color(0xFFD97706)
+                                    : const Color(0xFF16A34A),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  ApiClient.isUsingCustomBaseUrl
+                                      ? 'Özel İşletme Sunucusu Bağlı'
+                                      : 'Bulut Sunucu (Varsayılan / Demo)',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: ApiClient.isUsingCustomBaseUrl
+                                        ? const Color(0xFF92400E)
+                                        : const Color(0xFF166534),
+                                  ),
+                                ),
+                              ),
+                              InkWell(
+                                onTap: _openServerConfigDialog,
+                                borderRadius: BorderRadius.circular(6),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.edit_outlined,
+                                        size: 14,
+                                        color: Color(0xFF2563EB),
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Değiştir',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          color: Color(0xFF2563EB),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            ApiClient.baseUrl,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF475569),
+                              fontFamily: 'monospace',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: _openOneClickDeployWizard,
+                                icon: const Icon(
+                                  Icons.rocket_launch_rounded,
+                                  size: 14,
+                                  color: Color(0xFF2563EB),
+                                ),
+                                label: const Text(
+                                  '1-Tıkla Ücretsiz Sunucunu Kur 🚀',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  side: const BorderSide(
+                                    color: Color(0xFF93C5FD),
+                                  ),
+                                ),
+                              ),
+                              if (ApiClient.isUsingCustomBaseUrl)
+                                TextButton.icon(
+                                  onPressed: () async {
+                                    await ApiClient.setCustomBaseUrl('');
+                                    if (mounted) setState(() {});
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Demo / Varsayılan Render sunucusuna dönüldü.',
+                                        ),
+                                        backgroundColor: Color(0xFF16A34A),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(
+                                    Icons.restore_rounded,
+                                    size: 14,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                  label: const Text(
+                                    'Demo Sunucuya Dön',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 6,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                     Container(
                       width: 68,
                       height: 68,

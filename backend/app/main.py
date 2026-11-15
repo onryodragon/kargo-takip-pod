@@ -41,8 +41,9 @@ run_auto_setup()
 
 
 def _ping_render_health_sync() -> None:
+    ping_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/api/v1/health"
     req = UrlRequest(
-        RENDER_KEEP_ALIVE_URL,
+        ping_url,
         headers={"User-Agent": "Render-KeepAlive-Service/1.0"},
     )
     with urlopen(req, timeout=15.0) as resp:
@@ -52,14 +53,15 @@ def _ping_render_health_sync() -> None:
 async def _render_keep_alive_loop() -> None:
     """
     Render ücretsiz planda sunucunun 15 dakika hareketsizlik sonrası uyku moduna
-    geçmesini önlemek için her 10 dakikada bir `https://kargo-takip-pod.onrender.com/api/v1/health`
+    geçmesini önlemek için her 10 dakikada bir kendi /api/v1/health
     adresine otomatik istek atar.
     """
+    ping_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/api/v1/health"
     while True:
         await asyncio.sleep(RENDER_KEEP_ALIVE_INTERVAL_SECONDS)
         try:
             await asyncio.to_thread(_ping_render_health_sync)
-            logger.info("Render Keep-Alive ping başarılı: %s", RENDER_KEEP_ALIVE_URL)
+            logger.info("Render Keep-Alive ping başarılı: %s", ping_url)
         except asyncio.CancelledError:
             break
         except Exception as exc:
@@ -143,7 +145,7 @@ class TenantArchiveRequest(BaseModel):
 async def health_check():
     return {
         "status": "healthy",
-        "render_url": "https://kargo-takip-pod.onrender.com",
+        "render_url": settings.PUBLIC_BASE_URL,
         "keep_alive_interval_seconds": RENDER_KEEP_ALIVE_INTERVAL_SECONDS,
         "supabase_connected": settings.is_supabase_enabled,
         "storage_mode": "supabase" if settings.is_supabase_enabled else "sqlite (kargo_takip.db)",
