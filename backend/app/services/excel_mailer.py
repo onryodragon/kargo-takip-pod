@@ -426,18 +426,13 @@ class ExcelPoDMailerService:
         local_archive_path.write_bytes(excel_bytes)
         logger.info("Fotoğraflı & İmzalı PoD Excel arşive kaydedildi: %s", local_archive_path)
 
-        # E-posta Mesajını Hazırla
-        msg = EmailMessage()
+        # E-posta Konusu ve Gövdesi
         if len(orders) == 1:
-            msg["Subject"] = f"[{tenant_name}] Sipariş Teslim Kanıtı (PoD) — #{orders[0].order_number}"
+            subject = f"[{tenant_name}] Sipariş Teslim Kanıtı (PoD) — #{orders[0].order_number}"
         else:
-            msg["Subject"] = f"[{tenant_name}] Toplu Teslimat Kanıtı Arşivi ({len(orders)} Sipariş)"
+            subject = f"[{tenant_name}] Toplu Teslimat Kanıtı Arşivi ({len(orders)} Sipariş)"
 
-        msg["From"] = f"{tenant_name} Teslimat Sistemi <{self.smtp_config.sender_email}>"
-        msg["To"] = report_email
-
-        # Düz Metin ve HTML Gövdesi
-        msg.set_content(
+        text_body = (
             f"Merhaba {tenant_name} Yönetimi,\n\n"
             f"Tamamlanan {len(orders)} adet teslimata ait Fotoğraf ve Alıcı İmzası gömülü "
             f"Excel arşiv dosyanız ({filename}) ekte yer almaktadır.\n\n"
@@ -446,20 +441,19 @@ class ExcelPoDMailerService:
 
         rows_html = "".join(
             f"<tr>"
-            f"<td style='padding:8px;border:1px solid #cbd5e1;'><b>{o.order_number}</b></td>"
-            f"<td style='padding:8px;border:1px solid #cbd5e1;'>{o.customer_name}</td>"
-            f"<td style='padding:8px;border:1px solid #cbd5e1;'>{o.driver_name}</td>"
-            f"<td style='padding:8px;border:1px solid #cbd5e1;'>{o.delivery_address}</td>"
+            f"<td style='padding:8px;border:1px solid #cbd5e1;'><b>{html_escape(o.order_number)}</b></td>"
+            f"<td style='padding:8px;border:1px solid #cbd5e1;'>{html_escape(o.customer_name)}</td>"
+            f"<td style='padding:8px;border:1px solid #cbd5e1;'>{html_escape(o.driver_name)}</td>"
+            f"<td style='padding:8px;border:1px solid #cbd5e1;'>{html_escape(o.delivery_address)}</td>"
             f"</tr>"
             for o in orders
         )
 
-        msg.add_alternative(
-            f"""
+        html_body = f"""
             <html>
               <body style="font-family: Arial, sans-serif; color: #1e293b;">
                 <div style="background-color: #{primary_color_hex.lstrip('#')}; color: #ffffff; padding: 16px 24px; border-radius: 8px 8px 0 0;">
-                  <h2 style="margin: 0;">{tenant_name} — Teslimat Kanıtı (PoD) Raporu</h2>
+                  <h2 style="margin: 0;">{html_escape(tenant_name)} — Teslimat Kanıtı (PoD) Raporu</h2>
                 </div>
                 <div style="border: 1px solid #e2e8f0; padding: 20px; border-radius: 0 0 8px 8px;">
                   <p>Merhaba,</p>
@@ -478,41 +472,42 @@ class ExcelPoDMailerService:
                     </tbody>
                   </table>
                   <p style="margin-top: 20px; font-size: 12px; color: #64748b;">
-                    Bu e-posta {tenant_name} Teslimat Yönetim Sistemi tarafından otomatik oluşturulmuştur.
+                    Bu e-posta {html_escape(tenant_name)} Teslimat Yönetim Sistemi tarafından otomatik oluşturulmuştur.
                   </p>
                 </div>
               </body>
             </html>
-            """,
-            subtype="html",
+            """
+
+        # Herhangi bir e-posta kanalı (SMTP veya HTTP API) tanımlıysa gönder
+        has_channel = resolve_smtp_credentials(smtp_override) is not None or bool(
+            settings.RESEND_API_KEY or settings.BREVO_API_KEY or settings.SENDGRID_API_KEY
         )
-
-        # .xlsx Dosyasını Ekle
-        msg.add_attachment(
-            excel_bytes,
-            maintype="application",
-            subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            filename=filename,
-        )
-
-        # SMTP kimlik bilgileri tanımlıysa gönder (Önce uygulama içi tenant SMTP ayarlarına bak)
-        eff_host = (smtp_override or {}).get("host") or self.smtp_config.host
-        eff_port = int((smtp_override or {}).get("port") or self.smtp_config.port or 587)
-        eff_user = (smtp_override or {}).get("user") or self.smtp_config.username
-        eff_pass = (smtp_override or {}).get("password") or self.smtp_config.password
-
-        if eff_user and eff_pass:
-            del msg["From"]
-            msg["From"] = f"{tenant_name} Teslimat Sistemi <{eff_user}>"
-            with smtplib.SMTP(eff_host, eff_port, timeout=20) as server:
-                if self.smtp_config.use_tls:
-                    server.starttls()
-                server.login(eff_user, eff_pass)
-                server.send_message(msg)
-            logger.info("PoD Excel arşivi başarıyla e-posta ile gönderildi -> %s (%s)", report_email, filename)
+        if has_channel:
+            result = send_email(
+                to_email=report_email,
+                subject=subject,
+                html_body=html_body,
+                text_body=text_body,
+                sender_name=f"{tenant_name} Teslimat Sistemi",
+                attachments=[
+                    EmailAttachment(
+                        filename=filename,
+                        content=excel_bytes,
+                        mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
+                ],
+                smtp_override=smtp_override,
+            )
+            logger.info(
+                "PoD Excel arşivi e-posta ile gönderildi (%s) -> %s (%s)",
+                result.channel,
+                report_email,
+                filename,
+            )
         else:
             logger.info(
-                "SMTP bilgileri tanımlı olmadığı için e-posta adımı atlandı; Excel dosyası yerel arşive kaydedildi: %s (%d byte)",
+                "E-posta kanalı tanımlı olmadığı için gönderim atlandı; Excel dosyası yerel arşive kaydedildi: %s (%d byte)",
                 local_archive_path,
                 len(excel_bytes),
             )
@@ -527,65 +522,87 @@ class ExcelPoDMailerService:
         full_name: str,
         tenant_name: str,
         smtp_override: Optional[dict] = None,
-    ) -> bool:
+    ) -> EmailDeliveryResult:
         """
-        Şifremi Unuttum akışı için 6 haneli sıfırlama kodunu (OTP) kullanıcının
-        e-posta adresine gerçek SMTP üzerinden gönderir.
+        Şifremi Unuttum akışı için 6 haneli sıfırlama kodunu (OTP) şık bir HTML şablonla
+        kullanıcının e-posta adresine gönderir (HTTP API -> SMTP 465 SSL -> 587 STARTTLS -> 2525).
+        Gönderim başarısız olursa gerçek hata ayrıntılarını içeren `EmailDeliveryError` fırlatır.
+        Kod hiçbir koşulda log'a veya API yanıtına yazılmaz.
         """
-        eff_host = (smtp_override or {}).get("host") or self.smtp_config.host
-        eff_port = int((smtp_override or {}).get("port") or self.smtp_config.port or 587)
-        eff_user = (smtp_override or {}).get("user") or self.smtp_config.username
-        eff_pass = (smtp_override or {}).get("password") or self.smtp_config.password
+        safe_name = html_escape(full_name or "Kullanıcı")
+        safe_tenant = html_escape(tenant_name or "Teslimat Takip")
+        digits_html = "".join(
+            f'<td style="padding:0 4px;"><div style="width:44px;height:56px;line-height:56px;'
+            f'background:#ffffff;border:2px solid #c7d2fe;border-radius:12px;font-size:30px;'
+            f'font-weight:800;color:#1e3a8a;text-align:center;font-family:Consolas,Menlo,monospace;">{d}</div></td>'
+            for d in str(code)
+        )
+        year = datetime.now().year
 
-        if not eff_user or not eff_pass:
-            logger.warning(
-                "SMTP bilgileri girilmediği için şifre sıfırlama e-postası gönderilemedi (Alıcı: %s, Kod: %s)",
-                to_email,
-                code,
-            )
-            return False
-
-        msg = EmailMessage()
-        msg["Subject"] = f"[{tenant_name}] Şifre Sıfırlama Kodunuz: {code}"
-        msg["From"] = f"{tenant_name} Güvenlik Merkezi <{eff_user}>"
-        msg["To"] = to_email
-
-        msg.set_content(
+        subject = f"[{tenant_name}] Şifre Sıfırlama Doğrulama Kodunuz"
+        text_body = (
             f"Merhaba {full_name},\n\n"
-            f"Şifrenizi sıfırlamak için 6 haneli doğrulama kodunuz: {code}\n"
-            f"Bu kod 15 dakika boyunca geçerlidir.\n\n"
+            f"Hesabınızın şifresini sıfırlamak için 6 haneli doğrulama kodunuz: {code}\n"
+            f"Bu kod 15 dakika boyunca geçerlidir ve yalnızca bir kez kullanılabilir.\n\n"
+            f"Bu talebi siz yapmadıysanız bu e-postayı dikkate almayın; şifreniz değişmeyecektir.\n\n"
             f"{tenant_name} Teslimat & PoD Yönetim Sistemi"
         )
-        msg.add_alternative(
-            f"""
-            <html>
-              <body style="font-family: Arial, sans-serif; color: #1e293b;">
-                <div style="max-width: 480px; margin: 0 auto; border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden;">
-                  <div style="background-color: #1e40af; color: #ffffff; padding: 16px 20px;">
-                    <h3 style="margin: 0;">{tenant_name} — Şifre Sıfırlama Kodu</h3>
-                  </div>
-                  <div style="padding: 24px;">
-                    <p>Merhaba <b>{full_name}</b>,</p>
-                    <p>Hesabınızın şifresini yenilemek için aşağıdaki 6 haneli doğrulama kodunu uygulama ekranına girin:</p>
-                    <div style="background-color: #f1f5f9; border: 2px dashed #1e40af; border-radius: 10px; padding: 16px; text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #1e3a8a; margin: 20px 0;">
-                      {code}
-                    </div>
-                    <p style="font-size: 13px; color: #64748b;">Bu kod güvenlik nedeniyle 15 dakika boyunca geçerlidir.</p>
-                  </div>
-                </div>
-              </body>
-            </html>
-            """,
-            subtype="html",
-        )
+        html_body = f"""<!DOCTYPE html>
+<html lang="tr">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+  <body style="margin:0;padding:0;background:#eef2ff;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2ff;padding:32px 12px;">
+      <tr><td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 12px 32px rgba(30,58,138,0.15);">
+          <tr>
+            <td style="background:linear-gradient(135deg,#1e3a8a 0%,#4f46e5 100%);background-color:#1e3a8a;padding:28px 28px 24px;text-align:center;">
+              <div style="font-size:40px;line-height:1;">🔐</div>
+              <h1 style="margin:12px 0 4px;font-size:22px;color:#ffffff;font-weight:800;">Şifre Sıfırlama Kodu</h1>
+              <p style="margin:0;font-size:13px;color:#c7d2fe;">{safe_tenant} Güvenlik Merkezi</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px;">
+              <p style="margin:0 0 12px;font-size:15px;">Merhaba <b>{safe_name}</b>,</p>
+              <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#334155;">
+                Hesabınız için bir şifre sıfırlama talebi aldık. Uygulamadaki
+                <b>“Şifremi Unuttum”</b> ekranına aşağıdaki <b>6 haneli doğrulama kodunu</b> girin:
+              </p>
+              <table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:0 auto 20px;background:#eef2ff;border-radius:16px;padding:16px 12px;">
+                <tr>{digits_html}</tr>
+              </table>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fef9c3;border:1px solid #fde047;border-radius:12px;">
+                <tr><td style="padding:12px 14px;font-size:12.5px;color:#854d0e;line-height:1.5;">
+                  ⏱️ Bu kod <b>15 dakika</b> boyunca geçerlidir ve yalnızca <b>bir kez</b> kullanılabilir.<br>
+                  🛡️ Kodu kimseyle paylaşmayın. {safe_tenant} çalışanları sizden asla bu kodu istemez.
+                </td></tr>
+              </table>
+              <p style="margin:20px 0 0;font-size:12.5px;color:#64748b;line-height:1.5;">
+                Bu talebi siz yapmadıysanız bu e-postayı görmezden gelebilirsiniz; şifreniz değişmeyecektir.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 28px;text-align:center;font-size:11.5px;color:#94a3b8;">
+              © {year} {safe_tenant} • Teslimat &amp; PoD Yönetim Sistemi<br>Bu e-posta otomatik olarak gönderilmiştir, lütfen yanıtlamayın.
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>"""
 
-        with smtplib.SMTP(eff_host, eff_port, timeout=20) as server:
-            if self.smtp_config.use_tls:
-                server.starttls()
-            server.login(eff_user, eff_pass)
-            server.send_message(msg)
-        logger.info("6 haneli şifre sıfırlama kodu e-posta ile gönderildi -> %s", to_email)
-        return True
+        result = send_email(
+            to_email=to_email,
+            subject=subject,
+            html_body=html_body,
+            text_body=text_body,
+            sender_name=f"{tenant_name} Güvenlik Merkezi",
+            smtp_override=smtp_override,
+        )
+        logger.info("6 haneli şifre sıfırlama kodu e-posta ile gönderildi (%s) -> %s", result.channel, to_email)
+        return result
 
 
 # ============================================================================

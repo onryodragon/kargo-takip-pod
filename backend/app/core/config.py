@@ -81,6 +81,23 @@ class Settings:
     SMTP_USE_TLS: bool = field(
         default_factory=lambda: os.getenv("SMTP_USE_TLS", "true").lower() == "true"
     )
+    # Render ücretsiz planında 587/465 zaman aşımına uğrarsa sırayla denenecek yedek portlar
+    SMTP_FALLBACK_PORTS: str = field(
+        default_factory=lambda: os.getenv("SMTP_FALLBACK_PORTS", "465,587,2525")
+    )
+    SMTP_TIMEOUT_SECONDS: float = field(
+        default_factory=lambda: float(os.getenv("SMTP_TIMEOUT_SECONDS", "10"))
+    )
+
+    # HTTP API E-posta Sağlayıcıları (HTTPS 443 üzerinden — SMTP portu engelli sunucular için)
+    RESEND_API_KEY: str = field(default_factory=lambda: os.getenv("RESEND_API_KEY", "").strip())
+    BREVO_API_KEY: str = field(default_factory=lambda: os.getenv("BREVO_API_KEY", "").strip())
+    SENDGRID_API_KEY: str = field(default_factory=lambda: os.getenv("SENDGRID_API_KEY", "").strip())
+    MAIL_HTTP_FROM: str = field(default_factory=lambda: os.getenv("MAIL_HTTP_FROM", "").strip())
+    # Kanal sırası: "http,smtp" (HTTP API anahtarı varsa önce o denenir) veya "smtp,http"
+    EMAIL_DELIVERY_ORDER: str = field(
+        default_factory=lambda: os.getenv("EMAIL_DELIVERY_ORDER", "http,smtp")
+    )
 
     @property
     def is_supabase_enabled(self) -> bool:

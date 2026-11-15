@@ -38,6 +38,7 @@ class _CustomerTrackingScreenState extends State<CustomerTrackingScreen> {
 
   WebSocketChannel? _wsChannel;
   StreamSubscription<dynamic>? _wsSubscription;
+  Timer? _pollingTimer;
 
   TenantBranding _branding = TenantBranding.defaultTheme();
   bool _isLoading = true;
@@ -48,9 +49,15 @@ class _CustomerTrackingScreenState extends State<CustomerTrackingScreen> {
   String _statusMessage = '';
   String? _driverName;
   String? _vehiclePlate;
+  String? _vehicleType;
   LatLng? _destinationLatLng;
   LatLng? _driverLatLng;
   String? _errorMessage;
+
+  List<LatLng> _osrmRoutePoints = [];
+  double _remainingKm = 0.0;
+  double _remainingMinutes = 0.0;
+  LatLng? _lastRoutedDriverPos;
 
   @override
   void initState() {
@@ -60,6 +67,7 @@ class _CustomerTrackingScreenState extends State<CustomerTrackingScreen> {
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     _wsSubscription?.cancel();
     _wsChannel?.sink.close();
     super.dispose();
@@ -78,6 +86,7 @@ class _CustomerTrackingScreenState extends State<CustomerTrackingScreen> {
 
       if (_isActive) {
         _connectWebSocket();
+        _startPollingTimer();
       }
     } catch (e) {
       if (mounted) {
@@ -87,6 +96,20 @@ class _CustomerTrackingScreenState extends State<CustomerTrackingScreen> {
         });
       }
     }
+  }
+
+  void _startPollingTimer() {
+    _pollingTimer?.cancel();
+    // Mobil tarayıcılarda WebSocket bağlantı kopmasına karşı kesintisiz 2 saniyelik sorgulama
+    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      if (!mounted || !_isActive) return;
+      try {
+        final info =
+            await widget.apiClient.getPublicTrackingInfo(widget.trackingToken);
+        if (!mounted) return;
+        _applyTrackingPayload(info);
+      } catch (_) {}
+    });
   }
 
   void _applyTrackingPayload(Map<String, dynamic> data) {
@@ -102,38 +125,82 @@ class _CustomerTrackingScreenState extends State<CustomerTrackingScreen> {
     final driverMap = data['driver_location'] as Map<String, dynamic>?;
 
     LatLng? destPos = _destinationLatLng;
-    if (destMap != null && destMap['lat'] != null && destMap['lng'] != null) {
+    final dLat = destMap?['lat'] ?? data['dest_lat'];
+    final dLng = destMap?['lng'] ?? data['dest_lng'];
+    if (dLat != null && dLng != null) {
       destPos = LatLng(
-        (destMap['lat'] as num).toDouble(),
-        (destMap['lng'] as num).toDouble(),
+        (dLat as num).toDouble(),
+        (dLng as num).toDouble(),
       );
     }
 
     LatLng? drvPos = active ? _driverLatLng : null;
-    if (driverMap != null &&
-        driverMap['lat'] != null &&
-        driverMap['lng'] != null) {
+    final drvLat = driverMap?['lat'] ??
+        driverMap?['driver_lat'] ??
+        data['driver_lat'];
+    final drvLng = driverMap?['lng'] ??
+        driverMap?['driver_lng'] ??
+        data['driver_lng'];
+    if (drvLat != null && drvLng != null) {
       drvPos = LatLng(
-        (driverMap['lat'] as num).toDouble(),
-        (driverMap['lng'] as num).toDouble(),
+        (drvLat as num).toDouble(),
+        (drvLng as num).toDouble(),
       );
-      _driverName = driverMap['driver_name']?.toString() ?? _driverName;
-      _vehiclePlate = driverMap['vehicle_plate']?.toString() ?? _vehiclePlate;
+    }
+
+    final dName = driverMap?['driver_name']?.toString() ??
+        data['driver_name']?.toString();
+    final dPlate = driverMap?['vehicle_plate']?.toString() ??
+        data['vehicle_plate']?.toString();
+    final dType = driverMap?['vehicle_type']?.toString() ??
+        data['vehicle_type']?.toString();
+
+    if (dName != null && dName.isNotEmpty) _driverName = dName;
+    if (dPlate != null && dPlate.isNotEmpty) _vehiclePlate = dPlate;
+    if (dType != null && dType.isNotEmpty) _vehicleType = dType;
+
+    final wasActive = _isActive;
+    _isActive = active;
+    _orderNumber = (data['order_number'] ?? _orderNumber).toString();
+    _orderStatus = (data['status'] ?? _orderStatus).toString();
+    _deliveryAddress =
+        (data['delivery_address'] ?? _deliveryAddress).toString();
+    _statusMessage = (data['message'] ?? '').toString();
+    _destinationLatLng = destPos;
+    _driverLatLng = drvPos;
+    _isLoading = false;
+
+    if (!active) {
+      _pollingTimer?.cancel();
+    } else if (!wasActive) {
+      _startPollingTimer();
     }
 
     if (mounted) {
-      setState(() {
-        _isActive = active;
-        _orderNumber = (data['order_number'] ?? _orderNumber).toString();
-        _orderStatus = (data['status'] ?? _orderStatus).toString();
-        _deliveryAddress =
-            (data['delivery_address'] ?? _deliveryAddress).toString();
-        _statusMessage = (data['message'] ?? '').toString();
-        _destinationLatLng = destPos;
-        _driverLatLng = drvPos;
-        _isLoading = false;
-      });
+      setState(() {});
     }
+
+    _checkAndFetchOsrmRoute();
+  }
+
+  Future<void> _checkAndFetchOsrmRoute() async {
+    if (_driverLatLng == null || _destinationLatLng == null) return;
+    if (_lastRoutedDriverPos != null &&
+        SmartRoutingService.haversineKm(_lastRoutedDriverPos!, _driverLatLng!) <
+            0.035) {
+      return;
+    }
+    _lastRoutedDriverPos = _driverLatLng;
+    final result = await SmartRoutingService.fetchOsrmRoadRoute([
+      _driverLatLng!,
+      _destinationLatLng!,
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _osrmRoutePoints = result.polylinePoints;
+      _remainingKm = result.totalDistanceKm;
+      _remainingMinutes = result.totalDurationMinutes;
+    });
   }
 
   void _connectWebSocket() {
@@ -157,6 +224,7 @@ class _CustomerTrackingScreenState extends State<CustomerTrackingScreen> {
                       'Siparişiniz Teslim Edilmiştir. Güvenlik nedeniyle geçici canlı takip bağlantısı sonlandırılmıştır.';
                 });
               }
+              _pollingTimer?.cancel();
               _wsChannel?.sink.close();
               return;
             }
@@ -360,8 +428,10 @@ class _CustomerTrackingScreenState extends State<CustomerTrackingScreen> {
               PolylineLayer(
                 polylines: [
                   Polyline(
-                    points: [_driverLatLng!, _destinationLatLng!],
-                    strokeWidth: 4.5,
+                    points: _osrmRoutePoints.isNotEmpty
+                        ? _osrmRoutePoints
+                        : [_driverLatLng!, _destinationLatLng!],
+                    strokeWidth: 5.0,
                     color: _branding.primaryColor,
                   ),
                 ],
@@ -371,8 +441,8 @@ class _CustomerTrackingScreenState extends State<CustomerTrackingScreen> {
                 if (_destinationLatLng != null)
                   Marker(
                     point: _destinationLatLng!,
-                    width: 135,
-                    height: 76,
+                    width: 145,
+                    height: 80,
                     child: const BouncingOrderMapPin(
                       label: 'Teslimat Noktanız',
                       isFirstStop: true,
@@ -381,10 +451,13 @@ class _CustomerTrackingScreenState extends State<CustomerTrackingScreen> {
                 if (_driverLatLng != null)
                   Marker(
                     point: _driverLatLng!,
-                    width: 145,
-                    height: 80,
+                    width: 155,
+                    height: 88,
                     child: PulsingRadarVehiclePin(
-                      label: 'Kuryeniz Yolda',
+                      label: _driverName != null
+                          ? '$_driverName${_vehiclePlate != null ? " ($_vehiclePlate)" : ""}'
+                          : 'Kuryeniz Yolda',
+                      vehicleType: _vehicleType,
                       primaryColor: _branding.primaryColor,
                     ),
                   ),
@@ -449,9 +522,11 @@ class _CustomerTrackingScreenState extends State<CustomerTrackingScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        remainingKm != null
-                            ? 'Kurye adresinize ${remainingKm.toStringAsFixed(1)} km mesafede'
-                            : 'GPS sinyali saniyelik aktarılıyor',
+                        _remainingKm > 0
+                            ? 'Kurye adresinize ${_remainingKm.toStringAsFixed(1)} km mesafede (~${_remainingMinutes > 0 ? _remainingMinutes.toStringAsFixed(0) : "1"} dk)'
+                            : (remainingKm != null
+                                ? 'Kurye adresinize ${remainingKm.toStringAsFixed(1)} km mesafede'
+                                : 'GPS sinyali saniyelik aktarılıyor'),
                         style: const TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,

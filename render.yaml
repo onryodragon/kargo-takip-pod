@@ -28,3 +28,11 @@ services:
         value: "587"
       - key: SMTP_USE_TLS
         value: "true"
+      - key: SMTP_USER
+        value: "GONDERICI_GMAIL_ADRESIN@gmail.com"
+      - key: SMTP_PASSWORD
+        value: "16_HANELI_UYGULAMA_SIFREN"
+      - key: SMTP_FALLBACK_PORTS
+        value: "465,587,2525"
+      - key: EMAIL_DELIVERY_ORDER
+        value: "smtp,http"

@@ -113,9 +113,9 @@ def _verify_google_token_sync(
 )
 async def forgot_password(payload: ForgotPasswordRequest):
     """
-    GÖREV #6:
     Kullanıcının e-postasına 6 haneli sıfırlama kodu (OTP) üretir ve
-    işletmenin/sistemin Gmail SMTP ayarları üzerinden gerçek e-posta olarak gönderir.
+    dinamik olarak kullanıcının girdiği e-posta adresine gönderir.
+    Güvenlik kuralı gereği kod KESİNLİKLE ekrana veya yanıta yazdırılmaz.
     """
     code, user, tenant = db.create_password_reset_code(str(payload.email))
     smtp_creds = db.get_effective_smtp_credentials(
@@ -123,10 +123,8 @@ async def forgot_password(payload: ForgotPasswordRequest):
         email=str(payload.email),
     )
 
-    email_sent = False
-    smtp_error: Optional[str] = None
     try:
-        email_sent = await asyncio.to_thread(
+        await asyncio.to_thread(
             mailer_service.send_password_reset_otp_email,
             to_email=user["email"],
             code=code,
@@ -135,26 +133,16 @@ async def forgot_password(payload: ForgotPasswordRequest):
             smtp_override=smtp_creds,
         )
     except Exception as exc:
-        smtp_error = str(exc)
-        logger.warning("Şifre sıfırlama e-postası SMTP hatası: %s", exc)
+        logger.error("Şifre sıfırlama e-postası gönderilemedi (Alıcı: %s): %s", user["email"], exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"E-posta gönderimi başarısız oldu: {exc}",
+        ) from exc
 
-    if email_sent:
-        return {
-            "status": "sent",
-            "email_sent": True,
-            "message": f"6 haneli şifre sıfırlama kodunuz {user['email']} adresine gönderildi.",
-        }
-
-    # Henüz SMTP uygulama şifresi girilmemişse kullanıcı kilitlenmesin diye bilgilendir
     return {
-        "status": "generated",
-        "email_sent": False,
-        "fallback_code": code,
-        "smtp_error": smtp_error,
-        "message": (
-            "Sistemde henüz Gmail 16 haneli uygulama şifresi (SMTP) tanımlanmadığı için "
-            f"tek kullanımlık doğrulama kodunuz ekranda oluşturuldu: {code}"
-        ),
+        "status": "sent",
+        "email_sent": True,
+        "message": "6 haneli doğrulama kodu e-posta adresinize gönderildi.",
     }
 
 

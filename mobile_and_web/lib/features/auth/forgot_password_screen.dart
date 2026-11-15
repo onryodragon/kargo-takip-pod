@@ -59,17 +59,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     try {
       final res = await widget.apiClient.forgotPassword(email);
       if (!mounted) return;
-      final fallbackOtp = res['fallback_otp_code']?.toString();
       final msg = res['message']?.toString() ??
           '6 haneli doğrulama kodu e-posta adresinize gönderildi.';
       setState(() {
         _codeSent = true;
-        _statusMessage = fallbackOtp != null && fallbackOtp.isNotEmpty
-            ? '$msg\n(SMTP henüz tanımlanmadığı için tek kullanımlık kodunuz: $fallbackOtp)'
-            : msg;
-        if (fallbackOtp != null && fallbackOtp.isNotEmpty) {
-          _codeCtrl.text = fallbackOtp;
-        }
+        _statusMessage = msg;
+        _codeCtrl.clear();
       });
     } catch (e) {
       if (!mounted) return;

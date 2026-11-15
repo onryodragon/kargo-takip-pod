@@ -153,13 +153,23 @@ async def _process_and_broadcast_driver_location(
         order_id=order_id,
     )
 
+    driver_user = db.get_user_by_id(tenant_id, driver_id)
+    vehicle_plate = driver_user.get("vehicle_plate") if driver_user else None
+    vehicle_type = driver_user.get("vehicle_type") if driver_user else None
+    effective_name = driver_name or (driver_user.get("full_name") if driver_user else "Kurye")
+
     driver_payload = {
         "driver_id": driver_id,
-        "driver_name": driver_name,
+        "driver_name": effective_name,
+        "vehicle_plate": vehicle_plate,
+        "vehicle_type": vehicle_type,
         "lat": lat,
         "lng": lng,
-        "speed": speed,
+        "driver_lat": lat,
+        "driver_lng": lng,
         "heading": heading,
+        "driver_heading": heading,
+        "speed": speed,
         "accuracy": accuracy,
         "battery_level": battery_level,
         "recorded_at": log_entry["recorded_at"],
@@ -176,6 +186,14 @@ async def _process_and_broadcast_driver_location(
                     "is_active": True,
                     "order_number": order["order_number"],
                     "status": order["status"],
+                    "dest_lat": order.get("dest_lat"),
+                    "dest_lng": order.get("dest_lng"),
+                    "driver_lat": lat,
+                    "driver_lng": lng,
+                    "driver_heading": heading,
+                    "driver_name": effective_name,
+                    "vehicle_type": vehicle_type,
+                    "vehicle_plate": vehicle_plate,
                     "driver_location": driver_payload,
                 },
             )
@@ -354,12 +372,30 @@ async def get_public_tracking_info(tracking_token: str):
         }
 
     driver_location = None
+    driver_lat = None
+    driver_lng = None
+    driver_heading = 0.0
+    driver_name = None
+    vehicle_type = None
+    vehicle_plate = None
+
     if driver and driver.get("last_lat") is not None and driver.get("last_lng") is not None:
+        driver_lat = float(driver["last_lat"])
+        driver_lng = float(driver["last_lng"])
+        driver_heading = float(driver.get("last_heading") or 0.0)
+        driver_name = driver.get("full_name")
+        vehicle_type = driver.get("vehicle_type")
+        vehicle_plate = driver.get("vehicle_plate")
         driver_location = {
-            "driver_name": driver["full_name"],
-            "vehicle_plate": driver.get("vehicle_plate"),
-            "lat": driver["last_lat"],
-            "lng": driver["last_lng"],
+            "driver_name": driver_name,
+            "vehicle_plate": vehicle_plate,
+            "vehicle_type": vehicle_type,
+            "driver_lat": driver_lat,
+            "driver_lng": driver_lng,
+            "driver_heading": driver_heading,
+            "lat": driver_lat,
+            "lng": driver_lng,
+            "heading": driver_heading,
             "last_seen_at": driver.get("last_seen_at"),
         }
 
@@ -371,10 +407,18 @@ async def get_public_tracking_info(tracking_token: str):
         "delivery_address": order["delivery_address"],
         "white_label": white_label_header,
         "message": "Kuryeniz teslimat noktasına doğru hareket halinde.",
+        "dest_lat": order["dest_lat"],
+        "dest_lng": order["dest_lng"],
         "destination": {
             "lat": order["dest_lat"],
             "lng": order["dest_lng"],
         },
+        "driver_lat": driver_lat,
+        "driver_lng": driver_lng,
+        "driver_heading": driver_heading,
+        "driver_name": driver_name,
+        "vehicle_type": vehicle_type,
+        "vehicle_plate": vehicle_plate,
         "driver_location": driver_location,
     }
 
@@ -426,12 +470,30 @@ async def websocket_live_tracking(websocket: WebSocket, tracking_token: str):
     await tracking_ws_manager.connect(tracking_token, websocket)
 
     initial_driver_loc = None
+    drv_lat = None
+    drv_lng = None
+    drv_heading = 0.0
+    drv_name = None
+    drv_vtype = None
+    drv_vplate = None
+
     if driver and driver.get("last_lat") is not None and driver.get("last_lng") is not None:
+        drv_lat = float(driver["last_lat"])
+        drv_lng = float(driver["last_lng"])
+        drv_heading = float(driver.get("last_heading") or 0.0)
+        drv_name = driver.get("full_name")
+        drv_vtype = driver.get("vehicle_type")
+        drv_vplate = driver.get("vehicle_plate")
         initial_driver_loc = {
-            "driver_name": driver["full_name"],
-            "vehicle_plate": driver.get("vehicle_plate"),
-            "lat": driver["last_lat"],
-            "lng": driver["last_lng"],
+            "driver_name": drv_name,
+            "vehicle_plate": drv_vplate,
+            "vehicle_type": drv_vtype,
+            "driver_lat": drv_lat,
+            "driver_lng": drv_lng,
+            "driver_heading": drv_heading,
+            "lat": drv_lat,
+            "lng": drv_lng,
+            "heading": drv_heading,
             "last_seen_at": driver.get("last_seen_at"),
         }
 
@@ -446,10 +508,18 @@ async def websocket_live_tracking(websocket: WebSocket, tracking_token: str):
                 "logo_url": tenant.get("logo_url"),
                 "primary_color": tenant.get("primary_color", "#1E40AF"),
             },
+            "dest_lat": order["dest_lat"],
+            "dest_lng": order["dest_lng"],
             "destination": {
                 "lat": order["dest_lat"],
                 "lng": order["dest_lng"],
             },
+            "driver_lat": drv_lat,
+            "driver_lng": drv_lng,
+            "driver_heading": drv_heading,
+            "driver_name": drv_name,
+            "vehicle_type": drv_vtype,
+            "vehicle_plate": drv_vplate,
             "driver_location": initial_driver_loc,
         }
     )

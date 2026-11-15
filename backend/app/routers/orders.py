@@ -95,6 +95,10 @@ class OrderAdminAssignUpdateRequest(BaseModel):
     )
 
 
+class OrderStatusUpdateRequest(BaseModel):
+    status: str = Field(..., description="'assigned' veya 'in_transit'", examples=["in_transit"])
+
+
 class BatchOrderCreateRequest(BaseModel):
     assigned_driver_id: Optional[str] = Field(
         None,
@@ -274,6 +278,52 @@ async def update_order_assignment_or_location(
         **updated,
         "tracking_url": f"{settings.PUBLIC_TRACKING_WEB_URL}/{updated['tracking_token']}",
     }
+
+
+@router.patch(
+    "/{order_id}/status",
+    summary="Sipariş Durumunu Güncelle / Durağı Kabul Et (Kurye ve Admin)",
+)
+async def update_order_status_endpoint(
+    order_id: str,
+    payload: OrderStatusUpdateRequest,
+    current_user: CurrentUser = Depends(require_driver),
+):
+    """
+    GÖREV #3:
+    Kurye 'Durağı Kabul Et ve Navigasyonu Başlat' butonuna bastığında
+    sipariş durumunu 'in_transit' yapar. WebSocket üzerinden müşteriye ve yöneticiye anında bildirir.
+    """
+    updated = db.update_order_status_by_actor(
+        tenant_id=current_user.tenant_id,
+        order_id=order_id,
+        new_status=payload.status,
+        actor_user_id=current_user.user_id,
+        actor_role=current_user.role,
+    )
+
+    token = updated.get("tracking_token")
+    if token:
+        await tracking_ws_manager.broadcast_to_token(
+            token,
+            {
+                "event": "status_changed",
+                "order_number": updated["order_number"],
+                "status": updated["status"],
+            },
+        )
+
+    await tracking_ws_manager.broadcast_to_tenant(
+        current_user.tenant_id,
+        {
+            "event": "order_updated",
+            "order_id": order_id,
+            "status": updated["status"],
+            "assigned_driver_id": updated.get("assigned_driver_id"),
+        },
+    )
+
+    return updated
 
 
 @router.get(

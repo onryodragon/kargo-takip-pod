@@ -71,10 +71,14 @@ CREATE TABLE IF NOT EXISTS users (
     is_online       BOOLEAN NOT NULL DEFAULT FALSE,             -- Kurye aktif vardiyada mı?
     last_lat        DOUBLE PRECISION,                           -- Kuryenin bilinen son enlemi
     last_lng        DOUBLE PRECISION,                           -- Kuryenin bilinen son boylamı
+    last_heading    REAL DEFAULT 0,                             -- Kuryenin son yön açısı (0-360)
     last_seen_at    TIMESTAMPTZ,                                -- Son konum sinyali zamanı
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Mevcut veritabanları için göç: kurye yön açısı sütunu
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_heading REAL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_users_tenant_role ON users(tenant_id, role);
 CREATE INDEX IF NOT EXISTS idx_users_driver_online ON users(tenant_id, is_online) WHERE role = 'driver';
@@ -209,6 +213,7 @@ BEGIN
     UPDATE users
     SET last_lat = NEW.lat,
         last_lng = NEW.lng,
+        last_heading = COALESCE(NEW.heading, 0),
         last_seen_at = NEW.recorded_at,
         is_online = TRUE,
         updated_at = NOW()

@@ -459,6 +459,20 @@ class ApiClient {
     return _decodeResponse(response);
   }
 
+  /// Kurye durağı kabul ettiğinde ('in_transit') veya durum güncellendiğinde (`PATCH /api/v1/orders/{order_id}/status`)
+  Future<Map<String, dynamic>> updateOrderStatus({
+    required String orderId,
+    required String status,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/orders/$orderId/status');
+    final response = await http.patch(
+      uri,
+      headers: _authHeaders,
+      body: jsonEncode({'status': status}),
+    );
+    return _decodeResponse(response);
+  }
+
   /// Bir kuryeye çoklu sipariş / çoklu durak oluştur ve ata (`POST /api/v1/orders/batch`)
   Future<Map<String, dynamic>> createMultipleOrders({
     String? assignedDriverId,

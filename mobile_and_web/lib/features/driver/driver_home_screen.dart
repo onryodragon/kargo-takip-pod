@@ -213,24 +213,88 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
-  Future<void> _launchTurnByTurnNavigation(
+  Future<void> _acceptStopAndStartNavigation(Map<String, dynamic> order) async {
+    final orderId = order['id']?.toString() ?? '';
+    final dLat = (order['dest_lat'] as num).toDouble();
+    final dLng = (order['dest_lng'] as num).toDouble();
+
+    // 1. Siparişin durumu in_transit (Kurye Yolda) olarak güncellensin
+    try {
+      if (order['status'] != 'in_transit') {
+        await widget.apiClient.updateOrderStatus(
+          orderId: orderId,
+          status: 'in_transit',
+        );
+        setState(() {
+          order['status'] = 'in_transit';
+        });
+      }
+    } catch (_) {}
+
+    // 2. Kuryenin o anki GPS konumu anında alınıp sunucuya gönderilsin (müşteri haritasında kurye hemen belirsin)
+    final currentPos =
+        await widget.locationService.getCurrentCoordinateOrFallback();
+    widget.locationService.updateActiveOrderId(orderId);
+    try {
+      await widget.apiClient.sendDriverLiveLocation(
+        lat: currentPos.latitude,
+        lng: currentPos.longitude,
+        speed: 0.0,
+        heading: 0.0,
+        orderId: orderId,
+      );
+    } catch (_) {}
+
+    // 3. Uygulama içi harita kamerası kuryenin konumuna kilitlensin ve o durağa olan canlı yol çizgisini yakından göstersin
+    setState(() {
+      _selectedOrder = order;
+    });
+    try {
+      _mapController.move(currentPos, 15.5);
+    } catch (_) {}
+    _recomputeSmartRoute(currentPos);
+
+    // 4. Otomatik Sesli Navigasyon: Doğrudan sesli sürüş modunda başlat
+    await _launchVoiceDrivingNavigation(dLat, dLng);
+  }
+
+  Future<void> _launchVoiceDrivingNavigation(
     double destLat,
     double destLng,
   ) async {
+    // 1) Android yerel Google Navigasyon sesli sürüş modu
+    final nativeNavUri = Uri.parse(
+      'google.navigation:q=$destLat,$destLng&mode=d',
+    );
+    // 2) Google Maps Web sürüş yönlendirmesi
+    final webMapsUri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$destLat,$destLng&travelmode=driving',
+    );
+    // 3) Huawei Petal Maps ve genel Harita uygulamaları (geo:)
     final geoUri = Uri.parse(
       'geo:$destLat,$destLng?q=$destLat,$destLng(Teslimat Noktası)',
     );
-    final osmWebUri = Uri.parse(
-      'https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route='
-      '${widget.locationService.currentLatLng.latitude},${widget.locationService.currentLatLng.longitude}'
-      ';$destLat,$destLng',
-    );
 
-    if (await canLaunchUrl(geoUri)) {
-      await launchUrl(geoUri, mode: LaunchMode.externalApplication);
-    } else {
-      await launchUrl(osmWebUri, mode: LaunchMode.externalApplication);
-    }
+    try {
+      if (await canLaunchUrl(nativeNavUri)) {
+        await launchUrl(nativeNavUri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    } catch (_) {}
+
+    try {
+      if (await canLaunchUrl(webMapsUri)) {
+        await launchUrl(webMapsUri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    } catch (_) {}
+
+    try {
+      if (await canLaunchUrl(geoUri)) {
+        await launchUrl(geoUri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    } catch (_) {}
   }
 
   Future<void> _callCustomer(String phone) async {
@@ -638,48 +702,68 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                     const SizedBox(height: 12),
                                     SizedBox(
                                       width: double.infinity,
+                                      height: 48,
+                                      child: ElevatedButton.icon(
+                                        onPressed: () =>
+                                            _acceptStopAndStartNavigation(order),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF2563EB),
+                                          foregroundColor: Colors.white,
+                                          elevation: 3,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        icon: const Text(
+                                          '🧭',
+                                          style: TextStyle(fontSize: 18),
+                                        ),
+                                        label: Text(
+                                          (order['status'] == 'in_transit')
+                                              ? 'Navigasyonu Başlat (Yoldasınız) 🧭'
+                                              : 'Durağı Kabul Et ve Navigasyonu Başlat 🧭',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      width: double.infinity,
                                       child: WhatsAppShareButton(
                                         order: order,
                                         tenantName: branding.name,
                                       ),
                                     ),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: OutlinedButton.icon(
-                                            onPressed: () =>
-                                                _launchTurnByTurnNavigation(
-                                              dLat,
-                                              dLng,
-                                            ),
-                                            icon: const Icon(
-                                              Icons.navigation_outlined,
-                                              size: 18,
-                                            ),
-                                            label: const Text('Yol Tarifi Al'),
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      height: 44,
+                                      child: ElevatedButton.icon(
+                                        onPressed: () =>
+                                            _openMandatoryPodScreen(order),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFF16A34A),
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
                                           ),
                                         ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          flex: 2,
-                                          child: ElevatedButton.icon(
-                                            onPressed: () =>
-                                                _openMandatoryPodScreen(order),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor:
-                                                  const Color(0xFF16A34A),
-                                            ),
-                                            icon: const Icon(
-                                              Icons.camera_alt_outlined,
-                                              size: 18,
-                                            ),
-                                            label: const Text(
-                                              'Teslim Et (Foto + İmza)',
-                                            ),
+                                        icon: const Icon(
+                                          Icons.camera_alt_outlined,
+                                          size: 18,
+                                        ),
+                                        label: const Text(
+                                          'Teslim Et (Fotoğraf + İmza)',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13.5,
                                           ),
                                         ),
-                                      ],
+                                      ),
                                     ),
                                   ],
                                 ),

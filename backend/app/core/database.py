@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_online               INTEGER NOT NULL DEFAULT 0,
     last_lat                REAL,
     last_lng                REAL,
+    last_heading            REAL DEFAULT 0,
     last_seen_at            TEXT,
     created_at              TEXT NOT NULL,
     updated_at              TEXT NOT NULL
@@ -248,6 +249,7 @@ class MultiTenantRepository:
                     "ALTER TABLE users ADD COLUMN whatsapp_phone TEXT",
                     "ALTER TABLE users ADD COLUMN is_whatsapp_verified INTEGER NOT NULL DEFAULT 0",
                     "ALTER TABLE users ADD COLUMN google_sub TEXT",
+                    "ALTER TABLE users ADD COLUMN last_heading REAL DEFAULT 0",
                 ]
                 for stmt in migrations:
                     try:
@@ -1168,6 +1170,63 @@ class MultiTenantRepository:
             )
             conn.commit()
 
+    def update_order_status_by_actor(
+        self,
+        *,
+        tenant_id: str,
+        order_id: str,
+        new_status: str,
+        actor_user_id: str,
+        actor_role: str,
+    ) -> Dict[str, Any]:
+        """
+        Kurye durağı kabul ettiğinde (`in_transit`) veya yönetici durumu değiştirdiğinde
+        sipariş durumunu günceller. Kurye yalnızca kendisine atanmış siparişi
+        `assigned` <-> `in_transit` arasında değiştirebilir. `delivered` bu yoldan yapılamaz.
+        """
+        driver_allowed = {"assigned", "in_transit"}
+        admin_allowed = {"pending", "assigned", "in_transit", "cancelled"}
+        allowed = admin_allowed if actor_role == "admin" else driver_allowed
+        if new_status not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"'{new_status}' durumuna bu uç noktadan geçilemez. "
+                    "Teslimat için '/deliver' (Fotoğraf + İmza) kullanılmalıdır."
+                ),
+            )
+
+        order = self.get_order_by_id(tenant_id, order_id)
+        if order["status"] in ("delivered", "cancelled"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Teslim edilmiş veya iptal edilmiş siparişin durumu değiştirilemez.",
+            )
+        if actor_role == "driver" and order.get("assigned_driver_id") != actor_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="YETKİ HATASI: Sadece size atanmış olan durağı kabul edebilirsiniz.",
+            )
+
+        now_iso = _utc_now_iso()
+        if self._supabase:
+            res = (
+                self._supabase.table("orders")
+                .update({"status": new_status, "updated_at": now_iso})
+                .eq("tenant_id", tenant_id)
+                .eq("id", order_id)
+                .execute()
+            )
+            return res.data[0] if res.data else self.get_order_by_id(tenant_id, order_id)
+
+        with self._lock, self._get_sqlite_conn() as conn:
+            conn.execute(
+                "UPDATE orders SET status = ?, updated_at = ? WHERE tenant_id = ? AND id = ?",
+                (new_status, now_iso, tenant_id, order_id),
+            )
+            conn.commit()
+        return self.get_order_by_id(tenant_id, order_id)
+
     # -------------------------------------------------------------------------
     # 3. CANLI KONUM VE GEÇİCİ MÜŞTERİ TAKİP LİNKİ
     # -------------------------------------------------------------------------
@@ -1209,19 +1268,28 @@ class MultiTenantRepository:
                 )
                 .execute()
             )
-            self._supabase.table("users").update(
-                {
-                    "last_lat": lat,
-                    "last_lng": lng,
-                    "last_seen_at": now_iso,
-                    "is_online": True,
-                    "updated_at": now_iso,
-                }
-            ).eq("tenant_id", tenant_id).eq("id", driver_id).execute()
+            user_updates = {
+                "last_lat": lat,
+                "last_lng": lng,
+                "last_heading": heading,
+                "last_seen_at": now_iso,
+                "is_online": True,
+                "updated_at": now_iso,
+            }
+            try:
+                self._supabase.table("users").update(user_updates).eq(
+                    "tenant_id", tenant_id
+                ).eq("id", driver_id).execute()
+            except Exception:
+                # `last_heading` sütunu henüz eklenmemiş Supabase şemaları için geriye dönük uyumluluk
+                user_updates.pop("last_heading", None)
+                self._supabase.table("users").update(user_updates).eq(
+                    "tenant_id", tenant_id
+                ).eq("id", driver_id).execute()
 
             active_orders = (
                 self._supabase.table("orders")
-                .select("id, order_number, tracking_token, status, tracking_link_enabled")
+                .select("id, order_number, tracking_token, status, tracking_link_enabled, dest_lat, dest_lng")
                 .eq("tenant_id", tenant_id)
                 .eq("assigned_driver_id", driver_id)
                 .in_("status", ["assigned", "in_transit"])
@@ -1235,12 +1303,13 @@ class MultiTenantRepository:
                 UPDATE users
                 SET last_lat = ?,
                     last_lng = ?,
+                    last_heading = ?,
                     last_seen_at = ?,
                     is_online = 1,
                     updated_at = ?
                 WHERE tenant_id = ? AND id = ?
                 """,
-                (float(lat), float(lng), now_iso, now_iso, tenant_id, driver_id),
+                (float(lat), float(lng), float(heading or 0.0), now_iso, now_iso, tenant_id, driver_id),
             )
             cursor = conn.execute(
                 """
@@ -1265,7 +1334,7 @@ class MultiTenantRepository:
             log_id = cursor.lastrowid
             active_rows = conn.execute(
                 """
-                SELECT id, order_number, tracking_token, status, tracking_link_enabled
+                SELECT id, order_number, tracking_token, status, tracking_link_enabled, dest_lat, dest_lng
                 FROM orders
                 WHERE tenant_id = ?
                   AND assigned_driver_id = ?
