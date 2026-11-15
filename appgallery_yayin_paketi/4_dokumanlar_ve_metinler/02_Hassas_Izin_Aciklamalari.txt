@@ -1,0 +1,51 @@
+================================================================================
+HUAWEI APPGALLERY CONNECT - HASSAS İZİN AÇIKLAMALARI (PERMISSION RATIONALES)
+================================================================================
+Huawei AppGallery Connect inceleme panelinde "Uygulama İzinleri Açıklaması"
+veya inceleme notu alanına doğrudan yapıştırılmak üzere hazırlanmıştır.
+
+--------------------------------------------------------------------------------
+1. ARKA PLAN KONUM İZNİ (ACCESS_BACKGROUND_LOCATION & ACCESS_FINE_LOCATION)
+--------------------------------------------------------------------------------
+
+[TÜRKÇE GEREKÇE BEYANI]:
+"Kargo Takip & Canlı Kurye POD, kargo ve lojistik firmaları için saha teslimat yönetim uygulamasıdır. 
+ACCESS_BACKGROUND_LOCATION izni, yalnızca kurye rolündeki kullanıcı bir teslimatı 'Yolda' (in_transit) durumuna aldığında kullanılır. Kurye seyir halindeyken cihaz ekranını kapatsa veya navigasyon haritasına geçse dahi, paketi bekleyen müşterinin SMS/WhatsApp ile kendisine gönderilen güvenli web linki üzerinden kuryenin varışını harita üzerinde canlı takip edebilmesi ve acil durumlarda filo güvenliğinin sağlanabilmesi için periyodik GPS koordinatları sunucuya iletilir.
+Teslimat tamamlandığında veya kurye vardiyasını sonlandırdığında konum iletimi anında durdurulur. 
+Bu izin son alıcılardan veya yöneticilerden kesinlikle talep edilmez; yalnızca sahada aktif kurye olarak görev yapan sürücülerden açık rızaları alınarak talep edilir. Toplanan konum verileri üçüncü şahıslara veya reklam ağlarına kesinlikle satılmaz."
+
+[ENGLISH DECLARATION]:
+"Cargo Tracking & Courier PoD is a business logistics and courier fleet dispatch solution.
+The ACCESS_BACKGROUND_LOCATION permission is exclusively utilized by users registered as field couriers when an active delivery is dispatched ('in_transit'). While driving, couriers often lock their screens or switch to turn-by-turn navigation apps. Background GPS streaming ensures the recipient waiting for their parcel can continuously monitor the courier's real-time approach via a secure web tracking link, while allowing fleet dispatchers to ensure field driver safety.
+Location transmission terminates immediately once the parcel is marked as delivered or the driver logs off.
+This permission is never requested from consumers, recipients, or dispatchers—only from active field couriers with explicit consent. Location telemetry is strictly confidential and never shared with advertising or third-party networks."
+
+
+--------------------------------------------------------------------------------
+2. KAMERA İZNİ (android.permission.CAMERA)
+--------------------------------------------------------------------------------
+
+[TÜRKÇE GEREKÇE BEYANI]:
+"CAMERA izni, kuryenin teslimat adresine ulaştığında paketin/kolinin alıcıya teslim edildiğini kanıtlamak amacıyla çekilen Teslimat Kanıtı (Proof of Delivery - PoD) fotoğrafı için kullanılır.
+Fotoğraf çekimi, kurye tarafından teslimat tamamlama ekranındaki 'Fotoğraf Çek' butonuna bilinçli olarak basıldığında ve kamera vizörü ekranda açıkken gerçekleşir. 
+Uygulamamız arka planda asla gizli çekim yapmaz, mikrofon veya video kaydı almaz ve kullanıcının kişisel fotoğraf galerisine erişmez. Çekilen teslimat fotoğrafı doğrudan dijital teslim tutanağına ve işletmeye gönderilen resmi Excel raporuna gömülür."
+
+[ENGLISH DECLARATION]:
+"The CAMERA permission is required solely for couriers to photograph the delivered parcel at the doorstep as mandatory electronic Proof of Delivery (PoD).
+The camera is intentionally activated only when the driver taps the 'Capture Proof Photo' button on the delivery completion screen.
+The application never captures photos silently in the background, does not record audio or video, and does not access personal photo galleries. Captured delivery photos are strictly embedded into verified digital delivery logs and automated Excel reports delivered to the enterprise tenant."
+
+
+--------------------------------------------------------------------------------
+3. PİL OPTİMİZASYONU İSTİSNASI (REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+--------------------------------------------------------------------------------
+
+[TÜRKÇE GEREKÇE BEYANI]:
+"Android ve EMUI/HarmonyOS işletim sistemleri, arka planda çalışan uygulamaları enerji tasarrufu sağlamak amacıyla uyku (Doze) moduna almaktadır. 
+Kurye motosiklet veya araç kullanırken ekran kapalı olabileceğinden, işletim sisteminin GPS servisini zorla durdurması müşteri takip ekranında sinyal kaybına ve rota sapmalarına yol açmaktadır. 
+REQUEST_IGNORE_BATTERY_OPTIMIZATIONS izni, kuryenin aktif teslimat rotasındayken GPS konum servisinin kesintisiz çalışabilmesi amacıyla kullanılır. Kurye vardiyayı kapattığında servis sonlanır ve pil tüketimi normale döner."
+
+[ENGLISH DECLARATION]:
+"Android and EMUI/HarmonyOS aggressively throttle or terminate background processes to conserve power (Doze mode).
+Because field couriers navigate on vehicles with screens frequently turned off, system-level sleep modes cause immediate GPS dropouts, disrupting live customer tracking links.
+REQUEST_IGNORE_BATTERY_OPTIMIZATIONS ensures reliable and unbroken telemetry during active delivery shifts. When the driver completes assignments or clocks out, the foreground service stops completely, restoring standard battery saving behavior."

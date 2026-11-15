@@ -316,6 +316,20 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _openPrivacyPolicyWeb() async {
+    final base = ApiClient.baseUrl.replaceAll(RegExp(r'/api/v1/?$'), '');
+    final uri = Uri.parse('$base/privacy');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gizlilik politikası açılamadı: $uri')),
+        );
+      }
+    }
+  }
+
   void _showKvkkDialog() {
     showDialog(
       context: context,
@@ -373,6 +387,11 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
             ),
           ),
           actions: [
+            OutlinedButton.icon(
+              onPressed: _openPrivacyPolicyWeb,
+              icon: const Icon(Icons.open_in_new_rounded, size: 16),
+              label: const Text('Web\'de İncele'),
+            ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
               child: const Text('Kapat'),
@@ -1458,6 +1477,31 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
+                    const SizedBox(height: 14),
+                    Center(
+                      child: InkWell(
+                        onTap: _openPrivacyPolicyWeb,
+                        borderRadius: BorderRadius.circular(8),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.shield_outlined, size: 14, color: Color(0xFF64748B)),
+                              SizedBox(width: 5),
+                              Text(
+                                'Gizlilik Politikası & KVKK / GDPR Aydınlatma Metni',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF64748B),
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ).animate().fadeIn(duration: 420.ms).slideY(begin: 0.06, end: 0),

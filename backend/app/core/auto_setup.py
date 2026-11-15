@@ -143,8 +143,121 @@ def cleanup_legacy_demo_data() -> None:
                 pass
 
 
+def ensure_huawei_reviewer_accounts() -> None:
+    """
+    Huawei AppGallery Connect inceleme ekibi için otomatik hazır test hesaplarını ve
+    örnek siparişleri oluşturur (Sadece mevcut değilse ilklendirilir).
+    """
+    admin_email = "appgallery_admin@kargotakip.com"
+    driver_email = "appgallery_driver@kargotakip.com"
+
+    try:
+        if db.supabase_client:
+            res = (
+                db.supabase_client.table("users")
+                .select("id, tenant_id")
+                .eq("email", admin_email)
+                .execute()
+            )
+            exists = bool(res.data)
+        else:
+            with db._lock, db._get_sqlite_conn() as conn:
+                row = conn.execute(
+                    "SELECT id, tenant_id FROM users WHERE email = ?",
+                    (admin_email,),
+                ).fetchone()
+                exists = bool(row)
+
+        if exists:
+            logger.info("Huawei AppGallery test hesapları zaten mevcut.")
+            return
+
+        # 1. İşletme ve Yöneticiyi Oluştur
+        tenant, admin = db.register_tenant_and_admin(
+            name="Huawei AppGallery Test Lojistik",
+            slug="huawei-test-lojistik",
+            report_email=admin_email,
+            logo_url=None,
+            primary_color="#1E40AF",
+            phone="+905550002026",
+            admin_full_name="Huawei Store Reviewer",
+            admin_email=admin_email,
+            admin_phone="+905550002026",
+            admin_password="HuaweiTest2026!",
+        )
+        tenant_id = tenant["id"]
+        admin_id = admin["id"]
+
+        # 2. Saha Kuryesini Oluştur
+        driver = db.create_driver(
+            tenant_id=tenant_id,
+            full_name="Ahmet Huawei",
+            email=driver_email,
+            phone="+905550002026",
+            password="HuaweiTest2026!",
+            vehicle_plate="34 HWI 2026",
+            vehicle_type="Panelvan",
+        )
+        driver_id = driver["id"]
+
+        # 3. Kuryeyi Çevrimiçi Yap ve Canlı Konum Kaydet (Kadıköy / Moda)
+        try:
+            db.record_driver_location(
+                tenant_id=tenant_id,
+                driver_id=driver_id,
+                lat=40.9850,
+                lng=29.0300,
+                speed=28.5,
+                heading=45.0,
+                accuracy=10.0,
+                battery_level=92,
+            )
+        except Exception as loc_err:
+            logger.debug("Kurye başlangıç konumu ekleme uyarısı: %s", loc_err)
+
+        # 4. İnceleme Ekibi İçin 2 Adet Hazır Test Siparişi Ekle
+        # Sipariş 1: Atanmamış, Beklemede
+        db.create_order(
+            tenant_id=tenant_id,
+            created_by=admin_id,
+            order_number="HWI-1001",
+            customer_name="Canan Özdemir",
+            customer_phone="+905321112233",
+            delivery_address="Levent Mah. Büyükdere Cad. No:199, Şişli / İstanbul",
+            delivery_notes="Güvenliğe teslim edilebilir, zil arızalı.",
+            dest_lat=41.0782,
+            dest_lng=29.0115,
+            assigned_driver_id=None,
+            status_override="pending",
+        )
+
+        # Sipariş 2: Kuryeye Atanmış, Yolda (Canlı Takip Edilebilir)
+        db.create_order(
+            tenant_id=tenant_id,
+            created_by=admin_id,
+            order_number="HWI-1002",
+            customer_name="Murat Kaya",
+            customer_phone="+905423334455",
+            delivery_address="Bağdat Cad. No:340, Kadıköy / İstanbul",
+            delivery_notes="Giriş kat, lütfen gelmeden 5 dk önce arayınız.",
+            dest_lat=40.9632,
+            dest_lng=29.0684,
+            assigned_driver_id=driver_id,
+            status_override="in_transit",
+        )
+
+        logger.info(
+            "Huawei AppGallery test hesapları (%s / %s) ve siparişleri (HWI-1001, HWI-1002) oluşturuldu.",
+            admin_email,
+            driver_email,
+        )
+    except Exception as exc:
+        logger.warning("Huawei inceleme hesapları oluşturulurken hata: %s", exc)
+
+
 def run_auto_setup() -> None:
     """Uygulama ayağa kalkarken tüm sıfır-manuel kurulum adımlarını sırasıyla çalıştırır."""
     ensure_env_and_directories()
     auto_configure_supabase_if_enabled()
     cleanup_legacy_demo_data()
+    ensure_huawei_reviewer_accounts()

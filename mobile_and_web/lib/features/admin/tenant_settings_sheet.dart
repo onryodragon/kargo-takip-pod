@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
 
@@ -308,6 +309,36 @@ class _TenantSettingsSheetState extends State<TenantSettingsSheet> {
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: InkWell(
+                          onTap: () async {
+                            final base = ApiClient.baseUrl.replaceAll(RegExp(r'/api/v1/?$'), '');
+                            final uri = Uri.parse('$base/privacy');
+                            try {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            } catch (_) {}
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.shield_outlined, size: 14, color: Color(0xFF64748B)),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Gizlilik Politikası & KVKK / GDPR Bildirimi',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: Color(0xFF64748B),
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ],

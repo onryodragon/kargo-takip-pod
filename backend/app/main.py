@@ -17,7 +17,7 @@ from urllib.request import Request as UrlRequest, urlopen
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, StringConstraints
 
@@ -216,6 +216,313 @@ async def export_and_mail_pod_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+PRIVACY_POLICY_HTML = """<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gizlilik Politikası & KVKK / Privacy Policy - Kargo Takip PoD</title>
+    <style>
+        :root {
+            --primary: #0077FF;
+            --primary-dark: #0056B3;
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --bg-body: #F8FAFC;
+            --bg-card: #FFFFFF;
+            --border-color: #E2E8F0;
+            --accent: #10B981;
+            --tag-bg: #EFF6FF;
+            --tag-text: #1D4ED8;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.65;
+            padding: 24px 16px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #0A192F 0%, #0077FF 100%);
+            color: #ffffff;
+            padding: 40px 32px;
+            position: relative;
+        }
+        .header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .lang-switch {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .lang-btn {
+            background: rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            color: #fff;
+            padding: 7px 18px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .lang-btn.active, .lang-btn:hover {
+            background: #ffffff;
+            color: #0A192F;
+        }
+        .content {
+            padding: 36px 32px;
+        }
+        h2 {
+            font-size: 20px;
+            color: #0F172A;
+            margin-top: 28px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #F1F5F9;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        p, li {
+            font-size: 15px;
+            color: #334155;
+            margin-bottom: 12px;
+        }
+        ul {
+            padding-left: 20px;
+            margin-bottom: 16px;
+        }
+        li { margin-bottom: 8px; }
+        .perm-card {
+            background: #F8FAFC;
+            border-left: 4px solid var(--primary);
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin: 14px 0;
+            border: 1px solid var(--border-color);
+            border-left-width: 4px;
+        }
+        .perm-title {
+            font-weight: 700;
+            color: #0F172A;
+            font-size: 15px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .perm-code {
+            font-family: monospace;
+            background: var(--tag-bg);
+            color: var(--tag-text);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .highlight-box {
+            background: #ECFDF5;
+            border: 1px solid #A7F3D0;
+            color: #065F46;
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        .contact-box {
+            background: #F1F5F9;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 30px;
+            text-align: center;
+        }
+        .contact-box a {
+            color: var(--primary);
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .contact-box a:hover {
+            text-decoration: underline;
+        }
+        .footer {
+            text-align: center;
+            padding: 24px;
+            font-size: 13px;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-color);
+        }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 id="header-title">Gizlilik Politikası & KVKK Aydınlatma Metni</h1>
+            <p id="header-subtitle">Kargo Takip & Canlı Kurye POD Sistemi • Son Güncelleme: 15 Kasım 2026</p>
+            <div class="lang-switch">
+                <button class="lang-btn active" onclick="switchLang('tr')">🇹🇷 Türkçe</button>
+                <button class="lang-btn" onclick="switchLang('en')">🇬🇧 English</button>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- TÜRKÇE BÖLÜM -->
+            <div id="section-tr">
+                <div class="highlight-box">
+                    <strong>Bilgilendirme:</strong> İşbu Gizlilik Politikası ve KVKK Aydınlatma Metni, Kargo Takip & Teslimat Kanıtı (PoD) platformunun Huawei AppGallery mağaza kullanıcıları, kuryeleri, kurumsal işletmeleri ve teslimat alıcıları için 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) ve Genel Veri Koruma Yönetmeliği (GDPR) kapsamında hazırlanmıştır.
+                </div>
+
+                <h2>1. Veri Sorumlusu ve Hizmet Tanımı</h2>
+                <p>Kargo Takip POD platformu, işletmelerin sipariş ve teslimat süreçlerini yönetmelerini, kuryelerin paket teslimatlarını fotoğraflı ve imzalı olarak kanıtlamalarını (Proof of Delivery), müşterilerin ise kendilerine iletilen şifreli geçici link üzerinden kuryenin varışını haritada canlı izlemelerini sağlayan çok kiracılı (multi-tenant) bir kurumsal yazılım çözümüdür.</p>
+
+                <h2>2. İstenen Hassas Cihaz İzinleri ve Kullanım Amaçları</h2>
+                <p>Uygulamamız yalnızca temel lojistik işlevlerini yerine getirmek amacıyla aşağıdaki hassas sistem izinlerini talep eder. Verileriniz hiçbir reklam, pazarlama veya üçüncü şahıs veri tüccarı ile paylaşılmaz:</p>
+
+                <div class="perm-card">
+                    <div class="perm-title">📷 Kamera İzni <span class="perm-code">android.permission.CAMERA</span></div>
+                    <p><strong>Amaç:</strong> Yalnızca kurye paketi alıcıya teslim ettiği anda koli/paket teslim durumunun fotoğraflanması ve dijital tutanağa/Excel raporuna eklenmesi amacıyla kullanılır. Kurye kamerayı teslimat onay ekranında bizzat açar; uygulama arka planda veya habersizce asla kamera kaydı almaz ya da kullanıcının cihazındaki fotoğraf galerisini taramaz.</p>
+                </div>
+
+                <div class="perm-card">
+                    <div class="perm-title">📍 Canlı ve Arka Plan Konum İzni <span class="perm-code">android.permission.ACCESS_BACKGROUND_LOCATION</span></div>
+                    <p><strong>Amaç:</strong> Saha kuryesi bir siparişi teslimata çıkardığında (Durum: "Yolda / in_transit"), müşterinin SMS/WhatsApp ile kendisine iletilen geçici takip linki üzerinden kuryenin yaklaşmakta olduğunu haritada canlı olarak görebilmesi ve işletme yöneticisinin filo güvenliğini izleyebilmesi için gereklidir. Kurye uygulamayı alta aldığında veya ekran kapalıyken GPS sinyalinin kesilmemesi için arka plan konum erişimi kullanılır. Teslimat tamamlandığında veya kurye vardiyasını sonlandırdığında konum iletimi anında durdurulur. Müşterilerden veya yöneticilerden arka plan konum izni istenmez.</p>
+                </div>
+
+                <div class="perm-card">
+                    <div class="perm-title">⚡ Pil Optimizasyonu İstisnası <span class="perm-code">android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS</span></div>
+                    <p><strong>Amaç:</strong> Android işletim sisteminin kurye aktif sürüş ve teslimat halindeyken arka plan GPS servisini zorla uyutmasını (Doze modu) önlemek, teslimat esnasında müşteri haritasında kopukluk yaşanmasını engellemek için talep edilir.</p>
+                </div>
+
+                <div class="perm-card">
+                    <div class="perm-title">🌐 Ağ ve İnternet Erişimi <span class="perm-code">android.permission.INTERNET</span></div>
+                    <p><strong>Amaç:</strong> Sipariş durumlarının, teslimat koordinatlarının ve kanıt belgelerinin bulut sunucuya şifreli (TLS/HTTPS) aktarımı için zorunludur.</p>
+                </div>
+
+                <h2>3. Veri Güvenliği ve 24 Saatlik Harita Arşiv Kuralı</h2>
+                <p>Platformumuzda toplanan tüm veriler sektör standardı TLS/HTTPS protokolü ile şifrelenir. Kullanıcı şifreleri tek yönlü güçlü kriptografik özetleme algoritmaları ile saklanır. Gizlilik ilkesi gereği, tamamlanan siparişler ve kurye rota geçmişi harita üzerinden 24 saat sonra otomatik olarak arşivlenir ve genel harita görünümünden kaldırılır.</p>
+
+                <h2>4. 6698 Sayılı KVKK Kapsamındaki Haklarınız</h2>
+                <p>KVKK'nın 11. maddesi uyarınca veri sahipleri; kişisel verilerinin işlenip işlenmediğini öğrenme, işlenmişse buna ilişkin bilgi talep etme, işlenme amacını ve amacına uygun kullanılıp kullanılmadığını öğrenme, eksik veya yanlış işlenmişse düzeltilmesini isteme ve şartlar oluştuğunda verilerin silinmesini veya yok edilmesini talep etme hakkına sahiptir.</p>
+
+                <h2>5. Hesap ve Veri Silme Talepleri</h2>
+                <p>Kullanıcılar veya işletmeler, sisteme kayıtlı tüm verilerinin ve hesaplarının silinmesi talebini aşağıdaki destek e-posta adresimize iletebilirler. Talepler en geç 30 iş günü içerisinde yerine getirilir.</p>
+
+                <div class="contact-box">
+                    <h3>Resmi Destek ve İletişim</h3>
+                    <p>Her türlü gizlilik, veri güvenliği ve izin talepleriniz için:</p>
+                    <p><a href="mailto:destek@kargotakip.com">destek@kargotakip.com</a> / <a href="mailto:onryodragon@users.noreply.github.com">onryodragon@users.noreply.github.com</a></p>
+                </div>
+            </div>
+
+            <!-- ENGLISH SECTION -->
+            <div id="section-en" class="hidden">
+                <div class="highlight-box">
+                    <strong>Notice:</strong> This Privacy Policy and Data Protection Statement has been prepared in full compliance with GDPR and relevant international regulations for users, drivers, enterprise tenants, and delivery recipients using our app via Huawei AppGallery.
+                </div>
+
+                <h2>1. Data Controller & Service Overview</h2>
+                <p>Kargo Takip PoD is a multi-tenant cloud delivery management solution providing real-time driver tracking, electronic Proof of Delivery (PoD with photos and recipient signatures), and temporary live map tracking for customers receiving goods.</p>
+
+                <h2>2. Sensitive Permissions & Legitimate Use Cases</h2>
+                <p>Our application requests only the minimal necessary permissions strictly required to execute core logistics operations. We do not monetize, sell, or share user data with third-party advertising networks:</p>
+
+                <div class="perm-card">
+                    <div class="perm-title">📷 Camera Permission <span class="perm-code">android.permission.CAMERA</span></div>
+                    <p><strong>Purpose:</strong> Strictly utilized when a courier physically delivers a parcel to take a delivery photo as Proof of Delivery (PoD). The camera is explicitly opened by the driver on the delivery confirmation screen. The application never scans your device gallery or captures photos silently in the background.</p>
+                </div>
+
+                <div class="perm-card">
+                    <div class="perm-title">📍 Live & Background Location <span class="perm-code">android.permission.ACCESS_BACKGROUND_LOCATION</span></div>
+                    <p><strong>Purpose:</strong> Required exclusively for field couriers while an order is actively out for delivery ("in_transit"). It streams real-time GPS coordinates so waiting customers can track the driver's arrival via a temporary secure web link, and fleet dispatchers can ensure driver safety. Tracking stops immediately upon delivery completion or driver sign-off. Background location is never requested from customers or dispatchers.</p>
+                </div>
+
+                <div class="perm-card">
+                    <div class="perm-title">⚡ Battery Optimization Exemption <span class="perm-code">android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS</span></div>
+                    <p><strong>Purpose:</strong> Prevents the mobile operating system from suspending active GPS location updates while a driver navigates between delivery stops with the screen turned off.</p>
+                </div>
+
+                <div class="perm-card">
+                    <div class="perm-title">🌐 Network & Internet <span class="perm-code">android.permission.INTERNET</span></div>
+                    <p><strong>Purpose:</strong> Encrypted communication (TLS/HTTPS) with the secure backend server.</p>
+                </div>
+
+                <h2>3. Data Retention & 24-Hour Map Archive Policy</h2>
+                <p>All transmitted data is encrypted in transit using industry-standard TLS. Driver location traces for completed deliveries automatically expire and are removed from public/active live maps after 24 hours.</p>
+
+                <h2>4. Your GDPR & Privacy Rights</h2>
+                <p>You retain the right to access, rectify, restrict processing, or request total deletion of your personal data stored within our systems at any time.</p>
+
+                <h2>5. Account & Data Deletion Requests</h2>
+                <p>To request permanent deletion of your profile, enterprise tenant workspace, or associated delivery history, contact our support team:</p>
+
+                <div class="contact-box">
+                    <h3>Official Privacy Contact</h3>
+                    <p>Email our designated data protection team:</p>
+                    <p><a href="mailto:destek@kargotakip.com">destek@kargotakip.com</a> / <a href="mailto:onryodragon@users.noreply.github.com">onryodragon@users.noreply.github.com</a></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            &copy; 2026 Kargo Takip PoD Systems. All rights reserved. • GMS-Independent • Huawei AppGallery Ready
+        </div>
+    </div>
+
+    <script>
+        function switchLang(lang) {
+            const trSec = document.getElementById('section-tr');
+            const enSec = document.getElementById('section-en');
+            const btns = document.querySelectorAll('.lang-btn');
+            const title = document.getElementById('header-title');
+            const subtitle = document.getElementById('header-subtitle');
+
+            if (lang === 'en') {
+                trSec.classList.add('hidden');
+                enSec.classList.remove('hidden');
+                btns[0].classList.remove('active');
+                btns[1].classList.add('active');
+                title.textContent = 'Privacy Policy & Data Protection Statement';
+                subtitle.textContent = 'Cargo Tracking & Live Courier PoD System • Last Updated: November 15, 2026';
+            } else {
+                enSec.classList.add('hidden');
+                trSec.classList.remove('hidden');
+                btns[1].classList.remove('active');
+                btns[0].classList.add('active');
+                title.textContent = 'Gizlilik Politikası & KVKK Aydınlatma Metni';
+                subtitle.textContent = 'Kargo Takip & Canlı Kurye POD Sistemi • Son Güncelleme: 15 Kasım 2026';
+            }
+        }
+    </script>
+</body>
+</html>
+"""
+
+
+@app.get("/privacy", response_class=HTMLResponse, tags=["Yasal Bilgilendirme"])
+@app.get("/kvkk", response_class=HTMLResponse, tags=["Yasal Bilgilendirme"])
+async def serve_privacy_and_kvkk():
+    """Huawei AppGallery ve KVKK/GDPR uyumlu canlı Gizlilik Politikası ve Aydınlatma Metni."""
+    return HTMLResponse(content=PRIVACY_POLICY_HTML, status_code=200)
 
 
 # 3. Müşteri (/track/{tracking_token}) veya Kurye Davet (/driver-invite/{invite_token}) SPA yönlendirmesi

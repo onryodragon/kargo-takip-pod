@@ -1,0 +1,27 @@
+===================================================================
+HUAWEI APPGALLERY CONNECT - UYGULAMA İMZALAMA SERTİFİKA PARMAK İZLERİ
+===================================================================
+
+Uygulama Paket Adı (Package Name / ApplicationId):
+com.podsystem.kargo_takip_pod
+
+Anahtar Deposu (Keystore): release-keystore.jks
+Anahtar Takma Adı (Key Alias): kargotakip
+Anahtar & Depo Şifresi (Password): KargoTakipAppGallery2026!
+
+-------------------------------------------------------------------
+SERTİFİKA PARMAK İZLERİ (FINGERPRINTS):
+-------------------------------------------------------------------
+
+SHA-256 (Huawei AppGallery Connect 'SHA-256 certificate fingerprint' kutusuna yapıştırılacak):
+03:CF:BF:E1:25:C1:67:2D:FA:30:E7:D6:6D:3C:7C:8F:51:F3:E5:A5:DD:20:C5:73:E9:72:97:FE:97:85:42:41
+
+SHA-1:
+47:89:7C:DF:9D:99:BB:0F:37:8B:91:DC:22:13:60:91:5C:A0:F8:92
+
+MD5:
+E7:D8:0D:37:92:CB:1A:1D:6E:9B:F7:56:59:71:02:4B
+
+İmza Algoritması: SHA384withRSA (2048-bit RSA)
+Geçerlilik Bitiş Tarihi: 02 Nisan 2054 (~27 Yıl)
+Sahip Bilgisi: CN=Kargo Takip PoD, OU=Mobile Development, O=Kargo Takip Lojistik, L=Istanbul, ST=Istanbul, C=TR

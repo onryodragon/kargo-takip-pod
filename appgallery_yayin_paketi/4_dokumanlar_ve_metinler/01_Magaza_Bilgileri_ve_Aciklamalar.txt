@@ -1,0 +1,112 @@
+================================================================================
+HUAWEI APPGALLERY CONNECT - MAĞAZA BİLGİLERİ VE TANITIM METİNLERİ
+================================================================================
+
+[1. TEMEL UYGULAMA BİLGİLERİ / BASIC APP INFO]
+--------------------------------------------------------------------------------
+Uygulama Adı (TR)  : Kargo Takip & Canlı Kurye POD
+App Name (EN)      : Cargo Tracking & Courier PoD
+Paket Adı (Package): com.kargotakip.pod
+Varsayılan Dil     : Türkçe (tr-TR)
+Desteklenen Diller : Türkçe (tr-TR), İngilizce (en-US)
+Kategori (Category): İş / Üretkenlik / Lojistik (Business / Productivity / Navigation)
+İçerik Derecesi    : 3+ (Tüm Yaş Grupları İçin Uygun)
+Gizlilik URL (Web) : https://kargo-takip-pod.onrender.com/privacy
+KVKK URL (Web)     : https://kargo-takip-pod.onrender.com/kvkk
+Destek E-Postası   : destek@kargotakip.com
+Telif Hakkı        : © 2026 Kargo Takip PoD Systems. Tüm hakları saklıdır.
+
+
+[2. KISA AÇIKLAMA / SHORT DESCRIPTION (Maks. 80 Karakter)]
+--------------------------------------------------------------------------------
+TR (70 Karakter):
+Canlı kurye takibi, fotoğraflı ve imzalı teslimat kanıtı (PoD) sistemi.
+
+EN (72 Characters):
+Real-time courier tracking and electronic Proof of Delivery (PoD) system.
+
+
+[3. AYRINTILI TANITIM METNİ / FULL DESCRIPTION (TÜRKÇE)]
+--------------------------------------------------------------------------------
+Kargo Takip & Canlı Kurye POD; kargo, lojistik, kurye ve saha dağıtım işletmeleri için tasarlanmış yeni nesil, çok kiracılı (multi-tenant) teslimat yönetimi ve elektronik Teslimat Kanıtı (Proof of Delivery - PoD) platformudur.
+
+Google Mobil Servisleri'nden (GMS) tamamen bağımsız mimarisi sayesinde tüm Huawei akıllı telefon ve tabletlerinde sorunsuz, tam performansla çalışır.
+
+ÖNE ÇIKAN TEMEL ÖZELLİKLER:
+
+1. CANLI KURYE VE SİPARİŞ TAKİBİ
+• Sahadaki kuryelerin anlık konumunu harita üzerinde canlı izleyin.
+• Kurye paketi yola çıkardığında alıcı müşteriye tek kullanımlık şifreli takip linki iletilir.
+• Müşteriler ek uygulama yüklemeden tarayıcı üzerinden kuryenin varışını haritada canlı izleyebilir.
+• Gizlilik ilkesi gereği tamamlanan teslimatlar 24 saat sonra haritadan otomatik olarak arşivlenir.
+
+2. FOTOĞRAFLI VE İMZALI TESLİMAT KANITI (PoD)
+• Teslimat anında paket/koli fotoğrafı çekilerek sisteme işlenir.
+• Alıcının ıslak dijital imzası dokunmatik ekrandan saniyeler içinde alınır.
+• Fotoğraf ve imza olmadan teslimatın tamamlanmasını engelleyen zorunlu güvenlik denetimi.
+
+3. OTOMATİK FOTOĞRAFLI EXCEL ARŞİVİ
+• Teslimat tamamlandığında, çekilen teslimat fotoğrafı ve alıcı imzası doğrudan hücre içerisine gömülü biçimde profesyonel Excel (.xlsx) raporuna dönüştürülür.
+• Hazırlanan rapor işletmenin e-posta adresine anında otomatik iletilir ve yerel arşivde saklanır.
+
+4. ÇOKLU İŞLETME (MULTI-TENANT) VE WHITE-LABEL
+• Her işletme kendi logosu, kurumsal renkleri ve e-posta adresiyle tamamen izole bir çalışma alanına sahip olur.
+• WhatsApp üzerinden kuryelere tek tıkla davet bağlantısı gönderilebilir.
+
+5. BYOS - KENDİ SUNUCUNU BAĞLA (BRING YOUR OWN SERVER)
+• İşletmeler ister platformun varsayılan yüksek hızlı bulut altyapısını kullanabilir, ister 1 tıkla kendi bağımsız ücretsiz sunucusunu bağlayarak verilerinin tam kontrolünü sağlayabilir.
+
+
+[4. FULL DESCRIPTION (ENGLISH)]
+--------------------------------------------------------------------------------
+Cargo Tracking & Courier PoD is a next-generation multi-tenant delivery management and electronic Proof of Delivery (PoD) platform crafted for courier companies, logistics providers, and on-demand delivery fleets.
+
+Engineered with complete independence from Google Mobile Services (GMS-free), it delivers flawless reliability on all Huawei smartphones and tablets.
+
+KEY HIGHLIGHTS:
+
+1. REAL-TIME COURIER TRACKING
+• Real-time GPS location monitoring on interactive maps.
+• Automatic temporary tracking link shared with customers upon dispatch.
+• Recipients track driver arrival in real time without downloading any apps.
+• 24-hour privacy archiving rule automatically unlists completed routes.
+
+2. PHOTO & SIGNATURE PROOF OF DELIVERY (PoD)
+• High-resolution delivery photo capture at the recipient's doorstep.
+• Digital touchscreen signature captured instantly.
+• Strict validation constraints preventing completion without verified PoD.
+
+3. EMBEDDED EXCEL REPORTS WITH IMAGES
+• Automatic compilation of delivery photos and signatures directly embedded into professional Excel (.xlsx) spreadsheets.
+• Instant automated email dispatch to the enterprise mailbox upon completion.
+
+4. MULTI-TENANT & WHITE-LABEL
+• Fully isolated workspaces per enterprise with custom logo, primary theme colors, and reporting email.
+• Seamless driver onboarding via one-tap WhatsApp invitations.
+
+5. BRING YOUR OWN SERVER (BYOS) READY
+• Deploy on our lightning-fast cloud backend or connect your own private cloud instance with 1-click simplicity.
+
+
+[5. SÜRÜM NOTLARI / RELEASE NOTES (v1.0.0)]
+--------------------------------------------------------------------------------
+TR:
+• İlk resmi Huawei AppGallery sürümü!
+• GMS'ten bağımsız yüksek hassasiyetli canlı GPS takip motoru.
+• Fotoğraflı ve imzalı zorunlu teslimat kanıtı (PoD).
+• Otomatik fotoğraf ve imza gömülü Excel (.xlsx) e-posta raporlama.
+• Müşteriler için tek tıkla WhatsApp ve web canlı takip linki.
+• 24 saatlik rota ve sipariş gizlilik arşivi.
+
+EN:
+• Official debut release on Huawei AppGallery!
+• GMS-independent high-accuracy live GPS courier tracking.
+• Mandatory photo and signature capture for verifiable Proof of Delivery.
+• Automated Excel (.xlsx) reports with embedded photos and signatures.
+• Live web tracking links for recipients via SMS / WhatsApp.
+• 24-hour location privacy archiving policy.
+
+
+[6. ANAHTAR KELİMELER / KEYWORDS (Virgülle Ayrılmış)]
+--------------------------------------------------------------------------------
+kargo takip, kurye, teslimat, pod, proof of delivery, canlı takip, lojistik, filo yönetimi, koli, paket, imza, excel rapor, delivery tracking, courier, logistics

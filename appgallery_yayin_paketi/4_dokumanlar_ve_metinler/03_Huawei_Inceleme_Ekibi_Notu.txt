@@ -1,0 +1,99 @@
+================================================================================
+HUAWEI APPGALLERY CONNECT - İNCELEME EKİBİ NOTU (REVIEW TEAM NOTES)
+================================================================================
+Huawei AppGallery Connect konsolunda "Sürüm Bilgileri > İnceleme Bilgileri > 
+Notlar / İnceleme Ekibi İçin Giriş Bilgileri" alanına doğrudan yapıştırınız.
+
+--------------------------------------------------------------------------------
+[TÜRKÇE İNCELEME NOTU VE TEST HESAPLARI]
+--------------------------------------------------------------------------------
+Sayın Huawei İnceleme Ekibi,
+
+Uygulamamızı incelediğiniz için teşekkür ederiz. Sistemimiz kurumsal işletmeler (Admin) 
+ve saha kuryeleri (Driver) için iki farklı kullanıcı rolüne sahiptir. İnceleme sürecini 
+hızlı ve eksiksiz tamamlayabilmeniz için sisteme hazır test işletmesi ve iki ayrı test 
+hesabı tanımlanmıştır:
+
+1. TEST İŞLETMESİ:
+• İşletme Adı: Huawei AppGallery Test Lojistik
+
+2. YÖNETİCİ (ADMIN) TEST HESABI:
+• E-Posta : appgallery_admin@kargotakip.com
+• Şifre   : HuaweiTest2026!
+• Rol     : Filo & İşletme Yöneticisi (Admin)
+• Yetkiler: Sipariş oluşturma, kurye davet etme ("Sürücüler" sekmesi), canlı haritada 
+            kurye konumunu izleme, teslimatları denetleme ve Excel arşivini inceleme.
+
+3. SAHA KURYESİ (DRIVER) TEST HESABI:
+• E-Posta : appgallery_driver@kargotakip.com
+• Şifre   : HuaweiTest2026!
+• Rol     : Saha Kuryesi (Driver)
+• İsim    : Ahmet Huawei (Plaka: 34 HWI 2026)
+• Yetkiler: Kendisine atanan siparişleri görme, yola çıkma, adrese varış, kamera ile 
+            teslimat fotoğrafı çekme ve ekrandan alıcı imzası alarak teslimat tamamlama.
+
+4. HAZIR YÜKLÜ TEST SİPARİŞLERİ:
+Sisteme giriş yaptığınızda aşağıdaki siparişler hazır durumdadır:
+• HWI-1001: Beklemede (Yeni açılmış sipariş, yönetici tarafından atanabilir).
+• HWI-1002: Yolda (Kurye Ahmet Huawei'ye atanmış, canlı takip edilebilir sipariş).
+
+5. ADIM ADIM TEST ÖNERİSİ:
+Adım 1: Yönetici olarak giriş yapın (`appgallery_admin@kargotakip.com`). Harita ekranında 
+        kurye ve sipariş pinlerini görün. "Sürücüler" sekmesinde kayıtlı kuryeyi inceleyin.
+Adım 2: Çıkış yapıp Kurye olarak giriş yapın (`appgallery_driver@kargotakip.com`).
+Adım 3: Aktif "HWI-1002" siparişine tıklayın. "Teslimatı Tamamla" butonuna basın.
+Adım 4: Kamera vizöründen teslimat fotoğrafı çekin, alıcı adı yazıp dokunmatik ekranda 
+        imza atın ve onaylayın. Sistem teslimatı saniyeler içinde kanıtlı olarak tamamlar.
+
+6. CANLI GİZLİLİK POLİTİKASI (PRIVACY POLICY):
+• Web URL: https://kargo-takip-pod.onrender.com/privacy
+
+Herhangi bir sorunuz olursa bizimle 7/24 iletişime geçebilirsiniz:
+E-posta: destek@kargotakip.com / onryodragon@users.noreply.github.com
+
+
+--------------------------------------------------------------------------------
+[ENGLISH REVIEW NOTES & DEMO CREDENTIALS]
+--------------------------------------------------------------------------------
+Dear Huawei AppGallery Review Team,
+
+Thank you for reviewing our application. Cargo Tracking & Courier PoD features two 
+primary business roles: Fleet Dispatcher/Admin and Field Courier/Driver. 
+We have pre-provisioned a verified test workspace and test credentials with seeded orders 
+for your convenience:
+
+1. TEST ENTERPRISE WORKSPACE:
+• Company Name: Huawei AppGallery Test Lojistik
+
+2. ADMIN / DISPATCHER CREDENTIALS:
+• Email   : appgallery_admin@kargotakip.com
+• Password: HuaweiTest2026!
+• Role    : Fleet Admin
+• Features: Create delivery orders, inspect live GPS courier map, manage couriers 
+            in the "Drivers" tab, and review archived PoD records.
+
+3. DRIVER / COURIER CREDENTIALS:
+• Email   : appgallery_driver@kargotakip.com
+• Password: HuaweiTest2026!
+• Role    : Field Courier
+• Driver  : Ahmet Huawei (Vehicle Plate: 34 HWI 2026)
+• Features: View dispatched stops, trigger turn-by-turn routing, take delivery photos 
+            via device camera, capture digital recipient signatures, and complete PoD.
+
+4. PRE-SEEDED TEST DELIVERIES:
+• HWI-1001: Pending allocation.
+• HWI-1002: In Transit (Assigned to driver Ahmet Huawei).
+
+5. RECOMMENDED TESTING WALKTHROUGH:
+Step 1: Sign in with the Admin account (appgallery_admin@kargotakip.com). Review dashboard orders 
+        and inspect the real-time driver marker on the interactive map.
+Step 2: Sign out, then sign in with the Driver account (appgallery_driver@kargotakip.com).
+Step 3: Open active order "HWI-1002" and tap "Complete Delivery".
+Step 4: Take a quick delivery photo, enter recipient name, sign on the touch canvas, 
+        and confirm. The order finishes with verified PoD and generates embedded Excel reports.
+
+6. LIVE PRIVACY POLICY URL:
+• Web URL: https://kargo-takip-pod.onrender.com/privacy
+
+For technical inquiries or instant review assistance:
+Email: destek@kargotakip.com / onryodragon@users.noreply.github.com
