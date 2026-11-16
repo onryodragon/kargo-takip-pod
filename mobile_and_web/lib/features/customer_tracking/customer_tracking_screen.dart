@@ -8,6 +8,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/l10n/language_provider.dart';
+import '../../core/l10n/language_selector_button.dart';
 import '../../core/services/smart_routing_service.dart';
 import '../../core/theme/tenant_theme.dart';
 import '../../core/widgets/animated_saas_widgets.dart';
@@ -22,11 +24,13 @@ import '../../core/widgets/animated_saas_widgets.dart';
 class CustomerTrackingScreen extends StatefulWidget {
   final ApiClient apiClient;
   final String trackingToken;
+  final LanguageProvider? languageProvider;
 
   const CustomerTrackingScreen({
     super.key,
     required this.apiClient,
     required this.trackingToken,
+    this.languageProvider,
   });
 
   @override
@@ -271,6 +275,12 @@ class _CustomerTrackingScreenState extends State<CustomerTrackingScreen> {
         subtitle: _orderNumber.isNotEmpty
             ? 'Sipariş Canlı Takip • #$_orderNumber'
             : 'Müşteri Canlı Teslimat Takip Ekranı',
+        actions: [
+          LanguageSelectorButton(
+            languageProvider: widget.languageProvider,
+            compact: true,
+          ),
+        ],
       ),
       body: _isLoading
           ? const ShimmerOrderLoadingList(

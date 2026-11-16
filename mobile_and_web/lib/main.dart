@@ -1,8 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/api/api_client.dart';
+import 'core/l10n/app_localizations.dart';
+import 'core/l10n/language_provider.dart';
 import 'core/services/location_service.dart';
 import 'core/theme/tenant_theme.dart';
 import 'core/widgets/animated_saas_widgets.dart';
@@ -40,8 +43,10 @@ void main() async {
   final themeController = TenantThemeController();
   final apiClient = ApiClient(themeController: themeController);
   final locationService = GmsFreeLocationService(apiClient: apiClient);
+  final languageProvider = LanguageProvider();
 
   await apiClient.restoreSession();
+  await languageProvider.initialize();
 
   // URL üzerinden geçici müşteri takip token'ı (/track/:token) veya kurye davet token'ı (/driver-invite/:token) kontrolü
   final initialTrackingToken = _extractTrackingTokenFromUri(Uri.base);
@@ -52,6 +57,7 @@ void main() async {
       themeController: themeController,
       apiClient: apiClient,
       locationService: locationService,
+      languageProvider: languageProvider,
       initialTrackingToken: initialTrackingToken,
       initialDriverInviteToken: initialDriverInviteToken,
     ),
@@ -151,6 +157,7 @@ class MultiTenantDeliveryApp extends StatefulWidget {
   final TenantThemeController themeController;
   final ApiClient apiClient;
   final GmsFreeLocationService locationService;
+  final LanguageProvider languageProvider;
   final String? initialTrackingToken;
   final String? initialDriverInviteToken;
 
@@ -159,6 +166,7 @@ class MultiTenantDeliveryApp extends StatefulWidget {
     required this.themeController,
     required this.apiClient,
     required this.locationService,
+    required this.languageProvider,
     this.initialTrackingToken,
     this.initialDriverInviteToken,
   });
@@ -194,57 +202,70 @@ class _MultiTenantDeliveryAppState extends State<MultiTenantDeliveryApp> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.themeController,
-      builder: (context, _) {
-        return MaterialApp(
-          debugShowCheckedModeBanner: false,
-          title: widget.themeController.branding.name,
-          theme: widget.themeController.buildThemeData(),
-          onGenerateRoute: (RouteSettings routeSettings) {
-            final routeName = routeSettings.name ?? '';
-            if (routeName.isNotEmpty) {
-              final parsed = Uri.tryParse(routeName);
-              if (parsed != null) {
-                final trackToken = _extractTrackingTokenFromUri(parsed);
-                if (trackToken != null) {
-                  return createSmoothPageRoute(
-                    CustomerTrackingScreen(
-                      apiClient: widget.apiClient,
-                      trackingToken: trackToken,
-                    ),
-                    settings: routeSettings,
-                  );
-                }
+    return LanguageScope(
+      provider: widget.languageProvider,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([widget.themeController, widget.languageProvider]),
+        builder: (context, _) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: widget.themeController.branding.name,
+            theme: widget.themeController.buildThemeData(),
+            locale: widget.languageProvider.locale,
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            onGenerateRoute: (RouteSettings routeSettings) {
+              final routeName = routeSettings.name ?? '';
+              if (routeName.isNotEmpty) {
+                final parsed = Uri.tryParse(routeName);
+                if (parsed != null) {
+                  final trackToken = _extractTrackingTokenFromUri(parsed);
+                  if (trackToken != null) {
+                    return createSmoothPageRoute(
+                      CustomerTrackingScreen(
+                        apiClient: widget.apiClient,
+                        trackingToken: trackToken,
+                        languageProvider: widget.languageProvider,
+                      ),
+                      settings: routeSettings,
+                    );
+                  }
 
-                final inviteToken = _extractDriverInviteTokenFromUri(parsed);
-                if (inviteToken != null && !widget.apiClient.isAuthenticated) {
-                  return createSmoothPageRoute(
-                    DriverInviteRegisterScreen(
-                      apiClient: widget.apiClient,
-                      initialInviteToken: inviteToken,
-                      onRegistered: _refreshAuthState,
-                    ),
-                    settings: routeSettings,
-                  );
+                  final inviteToken = _extractDriverInviteTokenFromUri(parsed);
+                  if (inviteToken != null && !widget.apiClient.isAuthenticated) {
+                    return createSmoothPageRoute(
+                      DriverInviteRegisterScreen(
+                        apiClient: widget.apiClient,
+                        initialInviteToken: inviteToken,
+                        onRegistered: _refreshAuthState,
+                      ),
+                      settings: routeSettings,
+                    );
+                  }
                 }
               }
-            }
-            return createSmoothPageRoute(
-              _buildHomeScreen(),
-              settings: routeSettings,
-            );
-          },
-          home: FirstLaunchPrivacyGate(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 380),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              child: _buildHomeScreen(),
+              return createSmoothPageRoute(
+                _buildHomeScreen(),
+                settings: routeSettings,
+              );
+            },
+            home: FirstLaunchPrivacyGate(
+              languageProvider: widget.languageProvider,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 380),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                child: _buildHomeScreen(),
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -255,6 +276,7 @@ class _MultiTenantDeliveryAppState extends State<MultiTenantDeliveryApp> {
       return CustomerTrackingScreen(
         apiClient: widget.apiClient,
         trackingToken: widget.initialTrackingToken!,
+        languageProvider: widget.languageProvider,
       );
     }
 
@@ -274,6 +296,7 @@ class _MultiTenantDeliveryAppState extends State<MultiTenantDeliveryApp> {
       return AuthScreen(
         apiClient: widget.apiClient,
         onAuthenticated: _refreshAuthState,
+        languageProvider: widget.languageProvider,
       );
     }
 
@@ -290,6 +313,7 @@ class _MultiTenantDeliveryAppState extends State<MultiTenantDeliveryApp> {
       return AdminDashboardScreen(
         apiClient: widget.apiClient,
         onLogout: _handleLogout,
+        languageProvider: widget.languageProvider,
       );
     }
 
@@ -299,6 +323,7 @@ class _MultiTenantDeliveryAppState extends State<MultiTenantDeliveryApp> {
         apiClient: widget.apiClient,
         locationService: widget.locationService,
         onLogout: _handleLogout,
+        languageProvider: widget.languageProvider,
       ),
     );
   }

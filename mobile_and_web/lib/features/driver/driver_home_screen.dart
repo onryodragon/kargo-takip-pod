@@ -9,6 +9,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/l10n/language_provider.dart';
+import '../../core/l10n/language_selector_button.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/smart_routing_service.dart';
 import '../../core/theme/tenant_theme.dart';
@@ -25,12 +27,14 @@ class DriverHomeScreen extends StatefulWidget {
   final ApiClient apiClient;
   final GmsFreeLocationService locationService;
   final VoidCallback onLogout;
+  final LanguageProvider? languageProvider;
 
   const DriverHomeScreen({
     super.key,
     required this.apiClient,
     required this.locationService,
     required this.onLogout,
+    this.languageProvider,
   });
 
   @override
@@ -420,6 +424,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         subtitle:
             'Kurye: ${widget.apiClient.userFullName} • ${widget.locationService.isStreaming ? "1 sn Canlı GPS Aktif 🟢" : "GPS Bekleniyor"}',
         actions: [
+          LanguageSelectorButton(
+            languageProvider: widget.languageProvider,
+            compact: true,
+          ),
           IconButton(
             tooltip: 'Rotayı ve Siparişleri Yenile',
             onPressed: _loadAssignedOrders,

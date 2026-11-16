@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     smtp_port       INTEGER DEFAULT 587,
     smtp_user       TEXT,
     smtp_password   TEXT,
+    language        TEXT DEFAULT 'tr',
     is_active       INTEGER NOT NULL DEFAULT 1,
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
@@ -91,6 +92,7 @@ CREATE TABLE IF NOT EXISTS users (
     whatsapp_phone          TEXT,
     is_whatsapp_verified    INTEGER NOT NULL DEFAULT 0,
     google_sub              TEXT,
+    language                TEXT DEFAULT 'tr',
     is_active               INTEGER NOT NULL DEFAULT 1,
     is_online               INTEGER NOT NULL DEFAULT 0,
     last_lat                REAL,
@@ -250,6 +252,8 @@ class MultiTenantRepository:
                     "ALTER TABLE users ADD COLUMN is_whatsapp_verified INTEGER NOT NULL DEFAULT 0",
                     "ALTER TABLE users ADD COLUMN google_sub TEXT",
                     "ALTER TABLE users ADD COLUMN last_heading REAL DEFAULT 0",
+                    "ALTER TABLE tenants ADD COLUMN language TEXT DEFAULT 'tr'",
+                    "ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'tr'",
                 ]
                 for stmt in migrations:
                     try:
@@ -379,6 +383,7 @@ class MultiTenantRepository:
         admin_email: str,
         admin_phone: str,
         admin_password: str,
+        language: str = "tr",
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Yeni işletmeyi (`tenants`) ve ilk yöneticiyi (`users` role='admin') tek işlemde oluşturur.
@@ -421,6 +426,7 @@ class MultiTenantRepository:
                         "report_email": effective_report_email,
                         "primary_color": primary_color or "#1E40AF",
                         "phone": phone,
+                        "language": language or "tr",
                         "is_active": True,
                     }
                 )
@@ -438,6 +444,7 @@ class MultiTenantRepository:
                             "email": clean_email,
                             "phone": admin_phone.strip(),
                             "password_hash": pw_hash,
+                            "language": language or "tr",
                             "is_active": True,
                         }
                     )
@@ -465,8 +472,8 @@ class MultiTenantRepository:
 
             conn.execute(
                 """
-                INSERT INTO tenants (id, name, slug, logo_url, report_email, primary_color, phone, is_active, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                INSERT INTO tenants (id, name, slug, logo_url, report_email, primary_color, phone, language, is_active, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
                 """,
                 (
                     tenant_id,
@@ -476,14 +483,15 @@ class MultiTenantRepository:
                     effective_report_email,
                     primary_color or "#1E40AF",
                     phone,
+                    language or "tr",
                     now_iso,
                     now_iso,
                 ),
             )
             conn.execute(
                 """
-                INSERT INTO users (id, tenant_id, role, full_name, email, phone, password_hash, is_active, is_online, created_at, updated_at)
-                VALUES (?, ?, 'admin', ?, ?, ?, ?, 1, 0, ?, ?)
+                INSERT INTO users (id, tenant_id, role, full_name, email, phone, password_hash, language, is_active, is_online, created_at, updated_at)
+                VALUES (?, ?, 'admin', ?, ?, ?, ?, ?, 1, 0, ?, ?)
                 """,
                 (
                     admin_id,
@@ -492,6 +500,7 @@ class MultiTenantRepository:
                     clean_email,
                     admin_phone.strip(),
                     pw_hash,
+                    language or "tr",
                     now_iso,
                     now_iso,
                 ),
@@ -568,6 +577,7 @@ class MultiTenantRepository:
             "report_email",
             "primary_color",
             "phone",
+            "language",
             "smtp_host",
             "smtp_port",
             "smtp_user",

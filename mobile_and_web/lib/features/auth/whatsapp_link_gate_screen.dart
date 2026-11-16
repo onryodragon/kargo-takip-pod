@@ -32,11 +32,11 @@ class _WhatsAppLinkGateScreenState extends State<WhatsAppLinkGateScreen> {
 
   Future<void> _connectAndVerifyWhatsApp() async {
     final rawPhone = _phoneCtrl.text.trim();
-    final normalized = WhatsAppHelper.normalizeTurkishPhone(rawPhone);
-    if (normalized.length < 11) {
+    final normalized = WhatsAppHelper.normalizePhone(rawPhone);
+    if (normalized.length < 7) {
       setState(() {
         _error =
-            'Lütfen geçerli bir WhatsApp telefon numarası girin (Örn: 0532 000 00 00).';
+            'Lütfen geçerli bir WhatsApp telefon numarası girin.';
       });
       return;
     }

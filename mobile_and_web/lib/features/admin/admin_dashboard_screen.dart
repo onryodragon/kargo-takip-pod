@@ -10,6 +10,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/l10n/language_provider.dart';
+import '../../core/l10n/language_selector_button.dart';
 import '../../core/services/smart_routing_service.dart';
 import '../../core/theme/tenant_theme.dart';
 import '../../core/widgets/animated_saas_widgets.dart';
@@ -24,11 +26,13 @@ import 'tenant_settings_sheet.dart';
 class AdminDashboardScreen extends StatefulWidget {
   final ApiClient apiClient;
   final VoidCallback onLogout;
+  final LanguageProvider? languageProvider;
 
   const AdminDashboardScreen({
     super.key,
     required this.apiClient,
     required this.onLogout,
+    this.languageProvider,
   });
 
   @override
@@ -719,6 +723,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ? 'Yönetici Paneli • Aktif: $activeCount | Son 24s Teslim: $delivered24hCount'
             : 'Sürücüler & Filo Yönetimi • Toplam: ${_drivers.length} Kurye',
         actions: [
+          LanguageSelectorButton(
+            languageProvider: widget.languageProvider,
+            compact: true,
+          ),
           IconButton(
             tooltip: _selectedNavIndex == 0
                 ? 'Haritayı ve Akıllı Rotayı Yenile'

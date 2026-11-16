@@ -4,6 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/api_client.dart';
+import '../l10n/app_localizations.dart';
+import '../l10n/language_provider.dart';
+import '../l10n/language_selector_button.dart';
 
 /// Huawei AppGallery Zorunlu: İlk Açılış Gizlilik Politikası ve KVKK Onay Kapısı.
 ///
@@ -12,10 +15,12 @@ import '../api/api_client.dart';
 /// Kullanıcı "Kabul Et ve Devam Et" butonuna basana kadar uygulama ana ekranlarına geçilemez.
 class FirstLaunchPrivacyGate extends StatefulWidget {
   final Widget child;
+  final LanguageProvider? languageProvider;
 
   const FirstLaunchPrivacyGate({
     super.key,
     required this.child,
+    this.languageProvider,
   });
 
   @override
@@ -122,6 +127,16 @@ class _FirstLaunchPrivacyGateState extends State<FirstLaunchPrivacyGate> {
                     ),
                     child: Column(
                       children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            LanguageSelectorButton(
+                              languageProvider: widget.languageProvider,
+                              color: Colors.white,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
                         Container(
                           width: 56,
                           height: 56,
@@ -147,7 +162,7 @@ class _FirstLaunchPrivacyGateState extends State<FirstLaunchPrivacyGate> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Gizlilik Politikası ve Kullanıcı Sözleşmesi',
+                          AppLocalizations.of(context).privacySubtitle,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.9),
@@ -295,9 +310,9 @@ class _FirstLaunchPrivacyGateState extends State<FirstLaunchPrivacyGate> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                child: const Text(
-                                  'Reddet ve Çık',
-                                  style: TextStyle(
+                                child: Text(
+                                  AppLocalizations.of(context).privacyRejectBtn,
+                                  style: const TextStyle(
                                     color: Color(0xFF64748B),
                                     fontWeight: FontWeight.w600,
                                     fontSize: 13,
@@ -320,9 +335,9 @@ class _FirstLaunchPrivacyGateState extends State<FirstLaunchPrivacyGate> {
                                   ),
                                   elevation: 2,
                                 ),
-                                child: const Text(
-                                  'Kabul Et ve Devam Et',
-                                  style: TextStyle(
+                                child: Text(
+                                  AppLocalizations.of(context).privacyAcceptBtn,
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13.5,
                                   ),

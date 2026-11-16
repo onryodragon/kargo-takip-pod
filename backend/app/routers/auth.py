@@ -124,6 +124,7 @@ async def forgot_password(payload: ForgotPasswordRequest):
     )
 
     try:
+        user_lang = user.get("language") or tenant.get("language") or "tr"
         await asyncio.to_thread(
             mailer_service.send_password_reset_otp_email,
             to_email=user["email"],
@@ -131,6 +132,7 @@ async def forgot_password(payload: ForgotPasswordRequest):
             full_name=user["full_name"],
             tenant_name=tenant["name"],
             smtp_override=smtp_creds,
+            language=user_lang,
         )
     except Exception as exc:
         logger.error("Şifre sıfırlama e-postası gönderilemedi (Alıcı: %s): %s", user["email"], exc)

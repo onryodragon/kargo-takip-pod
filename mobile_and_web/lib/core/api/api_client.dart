@@ -19,6 +19,8 @@ class ApiClient {
   static const String defaultWsBaseUrl = 'wss://kargo-takip-pod.onrender.com';
   static const String baseWebUrl = 'https://kargo-takip-pod.onrender.com';
 
+  static String currentLanguage = 'tr';
+
   static String? _customBaseUrl;
 
   /// Varsayılan olarak canlı Render sunucusunu (`https://kargo-takip-pod.onrender.com`) kullanır.
@@ -115,6 +117,7 @@ class ApiClient {
 
   Map<String, String> get _authHeaders => {
         'Content-Type': 'application/json',
+        'Accept-Language': currentLanguage,
         if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
       };
 
@@ -183,6 +186,7 @@ class ApiClient {
     required String adminPhone,
     required String adminPassword,
     bool kvkkAccepted = true,
+    String? language,
   }) async {
     final uri = Uri.parse('$baseUrl/api/v1/tenants/register');
     final cleanAdminEmail = adminEmail.trim().toLowerCase();
@@ -193,7 +197,10 @@ class ApiClient {
 
     final response = await http.post(
       uri,
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept-Language': language ?? currentLanguage,
+      },
       body: jsonEncode({
         'name': name.trim(),
         if (slug != null && slug.trim().isNotEmpty) 'slug': slug.trim().toLowerCase(),
@@ -201,6 +208,7 @@ class ApiClient {
         'logo_url': (logoUrl != null && logoUrl.trim().isNotEmpty) ? logoUrl.trim() : null,
         'primary_color': primaryColor.trim().isEmpty ? '#1E40AF' : primaryColor.trim(),
         'phone': phone,
+        'language': language ?? currentLanguage,
         'admin_full_name': adminFullName.trim(),
         'admin_email': cleanAdminEmail,
         'admin_phone': adminPhone.trim(),
@@ -247,6 +255,7 @@ class ApiClient {
     String? reportEmail,
     String? primaryColor,
     String? phone,
+    String? language,
     String? smtpHost,
     int? smtpPort,
     String? smtpUser,
@@ -259,6 +268,7 @@ class ApiClient {
       if (reportEmail != null) 'report_email': reportEmail,
       if (primaryColor != null) 'primary_color': primaryColor,
       if (phone != null) 'phone': phone,
+      if (language != null) 'language': language,
       if (smtpHost != null) 'smtp_host': smtpHost,
       if (smtpPort != null) 'smtp_port': smtpPort,
       if (smtpUser != null) 'smtp_user': smtpUser,

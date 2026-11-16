@@ -1,0 +1,196 @@
+================================================================================
+HUAWEI APPGALLERY CONNECT - GLOBAL ÇOK DİLLİ MAĞAZA METİNLERİ (9 DİL)
+GLOBAL MULTI-LANGUAGE STORE METADATA FOR APPGALLERY CONNECT (9 LANGUAGES)
+================================================================================
+
+TEMEL MAĞAZA STANDARTLARI / STORE STANDARDS:
+- Uygulama Adı (App Name): Kargo Takip PoD (Tüm dillerde birebir aynı olmalıdır)
+- Paket Adı (Package Name): com.podsystem.kargo_takip_pod
+- Kategori: Business / Productivity / Logistics
+- GMS Durumu: GMS Bağımsız (OpenStreetMap & OSRM) - Tüm Huawei cihazlarıyla %100 uyumlu
+- Gizlilik URL: https://kargo-takip-pod.onrender.com/privacy
+- Destek E-Postası: onryodragon@users.noreply.github.com
+
+================================================================================
+1. TÜRKÇE (TR)
+================================================================================
+Uygulama Adı: Kargo Takip PoD
+Kısa Açıklama (Maks. 80 Karakter):
+Canlı kurye takibi, fotoğraflı ve imzalı teslimat kanıtı (PoD) sistemi.
+
+Ayrıntılı Tanıtım Metni:
+Kargo Takip PoD; lojistik, kargo ve saha dağıtım işletmeleri için tasarlanmış yeni nesil çok kiracılı (multi-tenant) teslimat yönetimi ve elektronik Teslimat Kanıtı (Proof of Delivery - PoD) platformudur.
+
+GMS'den (Google Mobil Servisleri) tamamen bağımsız mimarisi sayesinde tüm Huawei telefon ve tabletlerinde yüksek performansla çalışır.
+
+ÖNE ÇIKAN ÖZELLİKLER:
+• Canlı Kurye ve Sipariş Takibi: Sahadaki kuryelerin anlık konumunu OpenStreetMap üzerinde canlı takip edin.
+• Fotoğraflı & İmzalı PoD: Teslim anında paket fotoğrafı ve alıcı ıslak imzası alınarak teslimat belgelenir.
+• Otomatik Fotoğraflı Excel Raporu: Teslimat tamamlandığında fotoğraflar ve imzalar doğrudan hücrelere gömülerek işletmenin e-posta adresine iletilir.
+• Sürücüler & Filo Yönetimi: Boşta ve görevde olan sürücüleri anlık filtreleyin, WhatsApp ile tek tıkla kurye davet edin.
+• BYOS (Kendi Sunucunu Bağla): Render üzerinde 1 dakikada kendi ücretsiz sunucunuzu açıp bağlayarak %100 veri hakimiyeti sağlayın.
+• Çok Dilli Destek: 9 farklı dilde kullanım ve dünya çapında adres arama.
+
+================================================================================
+2. ENGLISH (EN)
+================================================================================
+App Name: Kargo Takip PoD
+Short Description (Max. 80 Characters):
+Real-time courier tracking, photo and signature proof of delivery PoD system.
+
+Full Description:
+Kargo Takip PoD is a next-generation multi-tenant delivery management and electronic Proof of Delivery (PoD) platform designed for logistics, courier, and field delivery businesses worldwide.
+
+Engineered with a 100% GMS-independent architecture using OpenStreetMap and OSRM, it delivers seamless, battery-friendly performance across all Huawei smartphones and tablets.
+
+KEY FEATURES:
+• Real-Time Courier Tracking: Track couriers live on OpenStreetMap with sub-second WebSocket updates.
+• Photo & Digital Signature PoD: Capture delivery photos and recipient signatures directly on the touch screen.
+• Automated Photo-Embedded Excel Archive: Automatically generates professional Excel (.xlsx) reports with embedded delivery photos and signatures sent to your business email.
+• Driver & Fleet Management: Filter couriers by Idle or Busy status, and send 1-click WhatsApp onboarding invitations.
+• BYOS (Bring Your Own Server): Deploy your own free cloud backend on Render in 1 minute with 100% data ownership.
+• Global Multi-Language Support: Available in 9 languages with worldwide address autocomplete and international phone format support.
+
+================================================================================
+3. GERMAN / DEUTSCH (DE)
+================================================================================
+App Name: Kargo Takip PoD
+Kurzbeschreibung (Max. 80 Zeichen):
+Echtzeit-Kurier-Tracking, Foto- und Signatur-Zustellnachweis (PoD) System.
+
+Vollständige Beschreibung:
+Kargo Takip PoD ist eine moderne Plattform für Liefermanagement und elektronischen Zustellnachweis (Proof of Delivery - PoD) für Logistik- und Kurierunternehmen.
+
+Dank der vollständigen Unabhängigkeit von Google-Diensten (GMS) läuft die App reibungslos auf allen Huawei-Geräten.
+
+HAUPTMERKMALE:
+• Echtzeit-Sendungsverfolgung: Verfolgen Sie Kuriere live auf der OpenStreetMap-Karte.
+• Foto- & Signaturnachweis: Erfassen Sie Zustellfotos und digitale Kundenunterschriften in Sekundenschnelle.
+• Automatische Excel-Berichte: Generiert Excel-Dateien mit eingebetteten Lieferfotos und Unterschriften direkt an Ihre E-Mail.
+• Flotten- & Fahrerverwaltung: Filtern Sie freie und beschäftigte Kuriere und laden Sie neue Fahrer per WhatsApp ein.
+• Eigener Server (BYOS): Verbinden Sie Ihren eigenen kostenlosen Render-Server für maximale Datensicherheit.
+• Mehrsprachig: Unterstützt 9 Sprachen mit weltweiter Adresssuche.
+
+================================================================================
+4. SPANISH / ESPAÑOL (ES)
+================================================================================
+Nombre de la Aplicación: Kargo Takip PoD
+Descripción Corta (Máx. 80 Caracteres):
+Seguimiento de repartidores en vivo, prueba de entrega PoD con foto y firma.
+
+Descripción Completa:
+Kargo Takip PoD es una solución avanzada de gestión de entregas y Comprobante de Entrega Electrónico (Proof of Delivery - PoD) para empresas de logística y paquetería.
+
+100% independiente de Google Mobile Services (GMS), ofreciendo un rendimiento óptimo en todos los dispositivos Huawei.
+
+CARACTERÍSTICAS PRINCIPALES:
+• Rastreo en Tiempo Real: Monitoree la ubicación en vivo de sus repartidores en mapas OpenStreetMap.
+• Prueba de Entrega (PoD): Capture fotos del paquete entregado y firmas digitales del receptor.
+• Reporte Excel Automático: Envío automático por correo electrónico de informes Excel con fotos y firmas incrustadas.
+• Gestión de Flota y Conductores: Visualice repartidores libres y en ruta; envíe invitaciones por WhatsApp con un solo clic.
+• Servidor Propio (BYOS): Implemente su propio backend gratuito en Render en 1 minuto.
+• Soporte Global: 9 idiomas disponibles y búsqueda de direcciones en todo el mundo.
+
+================================================================================
+5. FRENCH / FRANÇAIS (FR)
+================================================================================
+Nom de l'Application: Kargo Takip PoD
+Description Courte (Max. 80 Caractères):
+Suivi livreur en direct, preuve de livraison (PoD) avec photo et signature.
+
+Description Complète:
+Kargo Takip PoD est une plateforme de pointe pour la gestion des tournées de livraison et la Preuve de Livraison Électronique (PoD) dédiée aux professionnels du transport et de la logistique.
+
+Fonctionne sans Google Mobile Services (GMS) pour une compatibilité totale avec tous les smartphones et tablettes Huawei.
+
+POINTS FORTS:
+• Suivi en Temps Réel: Localisez vos livreurs en direct sur cartes OpenStreetMap.
+• Preuve de Livraison (PoD): Prise de photo du colis et signature numérique du client à la réception.
+• Rapports Excel Automatisés: Génération et envoi par e-mail de fichiers Excel avec photos et signatures intégrées dans les cellules.
+• Gestion des Chauffeurs: Filtres disponibles/en course et invitation simplifiée par WhatsApp.
+• Hébergement Dédié (BYOS): Déployez votre propre serveur gratuit sur Render en 1 minute.
+• International: Interface en 9 langues et autocomplétion d'adresses mondiale.
+
+================================================================================
+6. ARABIC / العربية (AR)
+================================================================================
+اسم التطبيق: Kargo Takip PoD
+الوصف القصير (بحد أقصى 80 حرفاً):
+تتبع المندوب مباشرة مع إثبات التسليم الإلكتروني بالصور والتوقيع الرقمي.
+
+الوصف الكامل:
+تطبيق Kargo Takip PoD هو منصة متقدمة لإدارة عمليات التوصيل اللوجستية وإثبات التسليم الإلكتروني (PoD) للشركات ومندوبي التوصيل حول العالم.
+
+يعمل التطبيق بشكل مستقل تماماً عن خدمات جوجل (GMS) مما يضمن أداءً فائقاً على كافة هواتف وأجهزة هواوي اللوحية.
+
+الميزات الرئيسية:
+• تتبع المناديب المباشر: متابعة مسار المناديب وحركة التوصيل لحظة بلحظة عبر خرائط OpenStreetMap.
+• إثبات التسليم بالصور والتوقيع: التقاط صورة الطرد وتوقيع المستلم مباشرة على الشاشة لإتمام العملية بأمان.
+• تقارير Excel مدمجة الصور تلقائياً: إنشاء وإرسال ملفات Excel تتضمن صور التسليم والتوقيعات إلى بريدك الإلكتروني.
+• إدارة أسطول المناديب: تصفية المناديب المتفرغين والمنشغلين مع إمكانية إرسال دعوات عبر واتساب بنقرة واحدة.
+• ربط خادمك الخاص (BYOS): أنشئ خادمك السحابي المجاني على Render في دقيقة واحدة لضمان خصوصية بياناتك بنسبة 100%.
+• دعم كامل للغة العربية والاتجاه من اليمين إلى اليسار (RTL) بالإضافة إلى 8 لغات عالمية أخرى.
+
+================================================================================
+7. RUSSIAN / РУССКИЙ (RU)
+================================================================================
+Название приложения: Kargo Takip PoD
+Краткое описание (Макс. 80 символов):
+Отслеживание курьеров в реальном времени, подтверждение доставки (PoD) с фото и подписью.
+
+Полное описание:
+Kargo Takip PoD — это современная многопользовательская платформа для управления курьерской доставкой и электронного подтверждения вручения (Proof of Delivery - PoD).
+
+Архитектура полностью независима от Google Mobile Services (GMS), обеспечивая безупречную работу на смартфонах и планшетах Huawei.
+
+ОСНОВНЫЕ ВОЗМОЖНОСТИ:
+• Онлайн-мониторинг курьеров: Отслеживание местоположения курьеров на картах OpenStreetMap.
+• Подтверждение доставки (PoD): Фотографирование посылки и электронная подпись получателя при передаче заказа.
+• Автоматический Excel-архив: Генерация отчетов Excel с вшитыми в ячейки фотографиями и подписями с отправкой на e-mail.
+• Управление водителями: Фильтрация свободных и занятых курьеров, приглашение водителей через WhatsApp в один клик.
+• Собственный сервер (BYOS): Развертывание бесплатного бэкенда на Render за 1 минуту для полного контроля над данными.
+• 9 языков интерфейса и глобальный поиск адресов по всему миру.
+
+================================================================================
+8. INDONESIAN / BAHASA INDONESIA (ID)
+================================================================================
+Nama Aplikasi: Kargo Takip PoD
+Deskripsi Singkat (Maks. 80 Karakter):
+Pelacakan kurir langsung, bukti pengiriman PoD dengan foto & tanda tangan.
+
+Deskripsi Lengkap:
+Kargo Takip PoD adalah platform manajemen pengiriman logistik dan Bukti Pengiriman Elektronik (Proof of Delivery - PoD) generasi baru untuk perusahaan ekspedisi dan kurir.
+
+Bebas 100% dari Google Mobile Services (GMS), berjalan cepat dan hemat baterai di semua perangkat Huawei.
+
+FITUR UTAMA:
+• Pelacakan Kurir Real-Time: Lacak posisi kurir secara langsung di peta OpenStreetMap.
+• Bukti Pengiriman (PoD): Ambil foto paket dan tanda tangan digital penerima di layar sentuh.
+• Arsip Excel Otomatis: Buat dan kirim laporan Excel dengan foto dan tanda tangan tersemat ke email bisnis Anda.
+• Manajemen Armada & Pengemudi: Filter kurir yang menganggur atau bertugas, kirim undangan bergabung via WhatsApp 1-klik.
+• Server Sendiri (BYOS): Pasang server gratis di Render dalam 1 menit untuk kepemilikan data 100%.
+• Mendukung 9 bahasa dan pencarian alamat internasional.
+
+================================================================================
+9. PORTUGUESE / PORTUGUÊS (PT)
+================================================================================
+Nome do Aplicativo: Kargo Takip PoD
+Descrição Curta (Máx. 80 Caracteres):
+Rastreamento de entregadores ao vivo, comprovante de entrega (PoD) com foto e assinatura.
+
+Descrição Completa:
+Kargo Takip PoD é uma plataforma moderna de gestão de entregas e Comprovante de Entrega Eletrônico (Proof of Delivery - PoD) para empresas de logística e transporte.
+
+Totalmente independente do Google Mobile Services (GMS), funcionando perfeitamente em todos os dispositivos Huawei.
+
+DESTAQUES DO SISTEMA:
+• Rastreamento em Tempo Real: Acompanhe a localização dos entregadores ao vivo no OpenStreetMap.
+• Comprovante com Foto e Assinatura: Capture a foto da entrega e a assinatura digital do recebedor na tela.
+• Relatório Excel Automatizado: Geração de arquivos Excel com fotos e assinaturas embutidas diretamente nas células, enviados por e-mail.
+• Gestão de Frota e Motoristas: Visualize entregadores livres ou em rota; convide novos motoristas pelo WhatsApp com 1 clique.
+• Servidor Próprio (BYOS): Implante seu servidor gratuito no Render em 1 minuto com 100% de controle sobre os dados.
+• Suporte a 9 idiomas e busca global de endereços.
+
+================================================================================
+FIN DU DOCUMENT / END OF DOCUMENT
+================================================================================

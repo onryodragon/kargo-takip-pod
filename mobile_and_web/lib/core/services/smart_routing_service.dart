@@ -68,26 +68,33 @@ class SmartRoutingService {
 
   static double _degToRad(double deg) => deg * (math.pi / 180.0);
 
-  /// Ücretsiz OpenStreetMap Nominatim + Komoot Photon üzerinden adres önerileri getirir.
+  /// Ücretsiz OpenStreetMap Nominatim + Komoot Photon üzerinden dünya çapında adres önerileri getirir.
   static Future<List<AddressSuggestion>> searchAddressAutocomplete(
     String query, {
     String? backendBaseUrl,
     String? authToken,
     int limit = 6,
+    String? language,
+    String? viewbox,
   }) async {
     final cleaned = query.trim();
     if (cleaned.length < 2) return [];
 
-    // 1. Öncelik: Doğrudan OpenStreetMap Nominatim API (Türkiye öncelikli)
+    final activeLang = (language ?? 'en').split(',').first.split('-').first.trim().toLowerCase();
+    final viewboxParam = (viewbox != null && viewbox.isNotEmpty)
+        ? '&viewbox=${Uri.encodeQueryComponent(viewbox)}&bounded=0'
+        : '';
+
+    // 1. Öncelik: Doğrudan OpenStreetMap Nominatim API (Dünya Geneli, Yerel Dil Destekli)
     try {
       final nominatimUri = Uri.parse(
         'https://nominatim.openstreetmap.org/search'
         '?format=json&q=${Uri.encodeQueryComponent(cleaned)}'
-        '&countrycodes=tr&addressdetails=1&limit=$limit',
+        '&addressdetails=1&limit=$limit&accept-language=$activeLang$viewboxParam',
       );
       final headers = <String, String>{
         'Accept': 'application/json',
-        'Accept-Language': 'tr,en;q=0.8',
+        'Accept-Language': '$activeLang,en;q=0.8',
         if (!kIsWeb) 'User-Agent': _userAgent,
       };
       final response = await http
@@ -112,7 +119,7 @@ class SmartRoutingService {
       try {
         final proxyUri = Uri.parse(
           '$backendBaseUrl/api/v1/orders/geocode/search'
-          '?q=${Uri.encodeQueryComponent(cleaned)}&limit=$limit',
+          '?q=${Uri.encodeQueryComponent(cleaned)}&limit=$limit&lang=$activeLang$viewboxParam',
         );
         final resp = await http.get(
           proxyUri,

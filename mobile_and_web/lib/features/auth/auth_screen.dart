@@ -4,6 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/l10n/language_provider.dart';
+import '../../core/l10n/language_selector_button.dart';
 import '../../core/widgets/animated_saas_widgets.dart';
 import 'driver_invite_register_screen.dart';
 import 'forgot_password_screen.dart';
@@ -14,11 +16,13 @@ import 'google_auth_sheet.dart';
 class AuthScreen extends StatefulWidget {
   final ApiClient apiClient;
   final VoidCallback onAuthenticated;
+  final LanguageProvider? languageProvider;
 
   const AuthScreen({
     super.key,
     required this.apiClient,
     required this.onAuthenticated,
+    this.languageProvider,
   });
 
   @override
@@ -915,6 +919,11 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          LanguageSelectorButton(
+            languageProvider: widget.languageProvider,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 8),
           Container(
             margin: const EdgeInsets.only(right: 16, top: 8),
             decoration: BoxDecoration(

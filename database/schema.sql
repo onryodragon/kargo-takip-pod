@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     smtp_port       INTEGER DEFAULT 587,
     smtp_user       VARCHAR(255),
     smtp_password   TEXT,
+    language        VARCHAR(10) DEFAULT 'tr',
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -67,6 +68,7 @@ CREATE TABLE IF NOT EXISTS users (
     whatsapp_phone  VARCHAR(30),                                -- Doğrulanmış WhatsApp numarası
     is_whatsapp_verified BOOLEAN NOT NULL DEFAULT FALSE,        -- Zorunlu WhatsApp doğrulama durumu
     google_sub      VARCHAR(255),                               -- GMS-bağımsız Google OAuth kimliği
+    language        VARCHAR(10) DEFAULT 'tr',
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     is_online       BOOLEAN NOT NULL DEFAULT FALSE,             -- Kurye aktif vardiyada mı?
     last_lat        DOUBLE PRECISION,                           -- Kuryenin bilinen son enlemi

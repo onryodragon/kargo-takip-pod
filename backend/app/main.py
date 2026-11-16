@@ -137,6 +137,7 @@ class TenantArchiveRequest(BaseModel):
     tenant_name: str = Field(..., examples=["Yıldız Ekspres Kargo"])
     report_email: EmailAddress = Field(..., examples=["rapor@yildizekspres.com"])
     primary_color_hex: str = Field("#1E40AF", examples=["#1E40AF"])
+    language: Optional[str] = Field("tr", examples=["tr", "en", "de", "es", "fr", "ar", "ru", "id", "pt"])
     orders: List[OrderPoDPayload]
 
 
@@ -202,12 +203,14 @@ async def export_and_mail_pod_excel(
             report_email=str(payload.report_email),
             orders=records,
             primary_color_hex=payload.primary_color_hex,
+            language=payload.language or "tr",
         )
 
     xlsx_bytes = mailer_service.generate_pod_excel_bytes(
         tenant_name=payload.tenant_name,
         orders=records,
         primary_color_hex=payload.primary_color_hex,
+        language=payload.language or "tr",
     )
 
     filename = f"PoD_Arsiv_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"

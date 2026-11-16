@@ -11,6 +11,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # 1. Harita (GMS Bağımsız - OpenStreetMap)
   flutter_map: ^7.0.2

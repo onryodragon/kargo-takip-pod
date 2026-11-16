@@ -120,12 +120,12 @@ class _AdminDriversTabState extends State<AdminDriversTab> {
 
   Future<void> _sendWhatsAppDriverInvite() async {
     final rawPhone = _invitePhoneCtrl.text.trim();
-    final normalized = WhatsAppHelper.normalizeTurkishPhone(rawPhone);
-    if (normalized.length < 11) {
+    final normalized = WhatsAppHelper.normalizePhone(rawPhone);
+    if (normalized.length < 7) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Lütfen kuryenin geçerli WhatsApp telefon numarasını girin (Örn: 0532 000 00 00).',
+            'Lütfen kuryenin geçerli WhatsApp telefon numarasını girin.',
           ),
           backgroundColor: Colors.orange,
         ),

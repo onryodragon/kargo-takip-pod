@@ -123,6 +123,7 @@ def _background_send_pod_excel_and_mark_archived(
     primary_color_hex: str,
     order_id: str,
     record: OrderPoDRecord,
+    language: str = "tr",
 ) -> None:
     """
     FastAPI `BackgroundTasks` içinde çalışır:
@@ -138,6 +139,7 @@ def _background_send_pod_excel_and_mark_archived(
             orders=[record],
             primary_color_hex=primary_color_hex,
             smtp_override=smtp_creds,
+            language=language,
         )
         db.mark_order_email_archived(tenant_id=tenant_id, order_id=order_id)
         logger.info(
@@ -333,13 +335,16 @@ async def update_order_status_endpoint(
 async def search_address_autocomplete(
     q: str = Query(..., min_length=2, description="Aranacak adres metni"),
     limit: int = Query(6, ge=1, le=12),
+    lang: Optional[str] = Query(None, description="Dil kodu (tr, en, de vb.)"),
+    viewbox: Optional[str] = Query(None, description="Öncelikli harita alanı (min_lon,max_lat,max_lon,min_lat)"),
     current_user: CurrentUser = Depends(require_admin),
 ) -> List[dict]:
     """
     Yönetici sipariş oluşturma ekranındaki adres arama çubuğu için
-    OpenStreetMap Nominatim + Komoot Photon üzerinden otomatik adres önerileri döner.
+    OpenStreetMap Nominatim + Komoot Photon üzerinden dünya çapında otomatik adres önerileri döner.
     """
-    return await asyncio.to_thread(search_address_suggestions, q, limit)
+    effective_lang = lang or "en"
+    return await asyncio.to_thread(search_address_suggestions, q, limit, effective_lang, viewbox)
 
 
 @router.post(
@@ -725,6 +730,7 @@ async def deliver_order_with_mandatory_pod(
         primary_color_hex=tenant.get("primary_color", "#1E40AF"),
         order_id=order_id,
         record=pod_record,
+        language=tenant.get("language") or "tr",
     )
 
     return {

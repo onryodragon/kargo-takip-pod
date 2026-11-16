@@ -45,6 +45,7 @@ class TenantRegisterRequest(BaseModel):
     logo_url: Optional[str] = Field(None, examples=["https://cdn.ornek.com/logo.png"])
     primary_color: str = Field("#1E40AF", examples=["#1E40AF"])
     phone: Optional[str] = Field(None, examples=["+90 216 000 00 00"])
+    language: Optional[str] = Field("tr", examples=["tr", "en", "de", "es", "fr", "ar", "ru", "id", "pt"])
 
     # İlk İşletme Sahibi (Admin) Bilgileri
     admin_full_name: str = Field(..., min_length=2, max_length=120, examples=["Olkan Yılmaz"])
@@ -70,6 +71,7 @@ class TenantUpdateRequest(BaseModel):
     report_email: Optional[EmailAddress] = None
     primary_color: Optional[str] = None
     phone: Optional[str] = None
+    language: Optional[str] = Field(None, examples=["tr", "en", "de", "es", "fr", "ar", "ru", "id", "pt"])
     smtp_host: Optional[str] = Field(None, examples=["smtp.gmail.com"])
     smtp_port: Optional[int] = Field(None, examples=[587])
     smtp_user: Optional[str] = Field(None, examples=["ornek@gmail.com"])
@@ -143,6 +145,7 @@ async def register_tenant(payload: TenantRegisterRequest):
         admin_email=str(payload.admin_email),
         admin_phone=payload.admin_phone,
         admin_password=payload.admin_password,
+        language=payload.language or "tr",
     )
 
     access_token = create_access_token(

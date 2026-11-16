@@ -162,19 +162,27 @@ def fetch_osrm_route(
     }
 
 
-def search_address_suggestions(query: str, limit: int = 6) -> List[Dict[str, Any]]:
+def search_address_suggestions(
+    query: str,
+    limit: int = 6,
+    language: str = "tr",
+    viewbox: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     """
     Ücretsiz ve API anahtarsız OpenStreetMap Nominatim + Komoot Photon servislerini
-    kullanarak Türkiye öncelikli adres önerileri döner.
+    kullanarak dünya çapında yerel dilde adres önerileri döner.
     """
     cleaned = (query or "").strip()
     if len(cleaned) < 2:
         return []
 
     encoded = quote(cleaned)
+    lang_code = (language or "en").split(",")[0].split("-")[0].strip().lower()
+    
+    viewbox_param = f"&viewbox={quote(viewbox)}&bounded=0" if viewbox else ""
     nominatim_url = (
         f"https://nominatim.openstreetmap.org/search"
-        f"?format=json&q={encoded}&countrycodes=tr&addressdetails=1&limit={int(limit)}"
+        f"?format=json&q={encoded}&addressdetails=1&limit={int(limit)}{viewbox_param}"
     )
 
     try:
@@ -182,7 +190,7 @@ def search_address_suggestions(query: str, limit: int = 6) -> List[Dict[str, Any
             nominatim_url,
             headers={
                 "User-Agent": USER_AGENT_HEADER,
-                "Accept-Language": "tr,en;q=0.8",
+                "Accept-Language": f"{lang_code},en;q=0.8",
             },
         )
         with urlopen(req, timeout=6.0) as resp:
