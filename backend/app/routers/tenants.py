@@ -177,11 +177,21 @@ async def login(payload: LoginRequest):
         email=user["email"],
         full_name=user["full_name"],
     )
+    is_reviewer_admin = user.get("email", "").strip().lower() == "appgallery_admin@kargotakip.com"
+    tenant_dict = _sanitize_tenant(tenant)
+    user_dict = {k: v for k, v in user.items() if k != "password_hash"}
+    if is_reviewer_admin:
+        tenant_dict["is_pro"] = True
+        user_dict["is_pro"] = True
+    else:
+        tenant_dict["is_pro"] = bool(tenant_dict.get("is_pro", False))
+        user_dict["is_pro"] = bool(user_dict.get("is_pro", False))
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "tenant": _sanitize_tenant(tenant),
-        "user": {k: v for k, v in user.items() if k != "password_hash"},
+        "tenant": tenant_dict,
+        "user": user_dict,
     }
 
 
@@ -404,3 +414,58 @@ async def list_tenant_drivers(
         enriched_drivers.append(drv_dict)
 
     return enriched_drivers
+
+
+# ============================================================================
+# HUAWEI IN-APP PURCHASES (IAP) - 10 EURO ÖMÜR BOYU LİSANS YÖNETİMİ
+# ============================================================================
+class ProActivationRequest(BaseModel):
+    product_id: str = Field("pro_lifetime_10eur", examples=["pro_lifetime_10eur"])
+    purchase_token: Optional[str] = Field(None, examples=["huawei-iap-purchase-token"])
+
+
+@router.post(
+    "/activate-pro",
+    summary="Huawei IAP 10 Euro Ömür Boyu Lisansını (pro_lifetime_10eur) Aktif Et",
+)
+async def activate_pro_lifetime(
+    payload: ProActivationRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """
+    Huawei In-App Purchases (IAP) üzerinden 'pro_lifetime_10eur' satın alındığında
+    hem işletme (tenant) hem de kullanıcı kaydında 'is_pro = 1' olarak kalıcı günceller.
+    """
+    db.activate_pro(current_user.tenant_id, current_user.user_id)
+    return {
+        "success": True,
+        "is_pro": True,
+        "product_id": payload.product_id,
+        "message": "Kargo Takip PoD PRO Ömür Boyu Lisans başarıyla aktif edildi.",
+    }
+
+
+@router.get(
+    "/pro-status",
+    summary="İşletmenin ve Giriş Yapan Hesabın PRO Durumunu Sorgula",
+)
+async def get_pro_status(
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """
+    Kullanıcının veya işletmenin PRO lisansını sorgular.
+    Kurye (driver) ve Huawei inceleme hesabı (appgallery_admin@kargotakip.com) otomatik PRO kabul edilir.
+    """
+    is_pro = db.is_tenant_pro(current_user.tenant_id, current_user.email)
+    if current_user.role == "driver" or (
+        current_user.email and current_user.email.strip().lower() == "appgallery_admin@kargotakip.com"
+    ):
+        is_pro = True
+    return {
+        "is_pro": is_pro,
+        "tenant_id": current_user.tenant_id,
+        "user_id": current_user.user_id,
+        "role": current_user.role,
+        "email": current_user.email,
+    }
+

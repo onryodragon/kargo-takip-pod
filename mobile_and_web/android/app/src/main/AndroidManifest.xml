@@ -61,6 +61,11 @@
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
 
+        <!-- Huawei AppGallery Connect & IAP App ID -->
+        <meta-data
+            android:name="com.huawei.hms.client.appid"
+            android:value="appid=119831581" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

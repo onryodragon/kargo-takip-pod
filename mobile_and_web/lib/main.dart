@@ -17,6 +17,7 @@ import 'features/auth/whatsapp_link_gate_screen.dart';
 import 'features/customer_tracking/customer_tracking_screen.dart';
 import 'features/driver/driver_home_screen.dart';
 import 'features/driver/driver_permission_gate.dart';
+import 'features/paywall/pro_paywall_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -308,8 +309,20 @@ class _MultiTenantDeliveryAppState extends State<MultiTenantDeliveryApp> {
       );
     }
 
-    // 5. KURAL: Rol 'admin' ise Yönetici 24 Saatlik Operasyon Paneli
+    // 5. KURAL: Rol 'admin' ise
     if (widget.apiClient.userRole == 'admin') {
+      // PRO KONTROLÜ (Huawei IAP 10 Euro Ömür Boyu Paywall):
+      // - Test hesabı ('appgallery_admin@kargotakip.com') otomatik bypass edilir.
+      // - Lisans almamış yöneticilere tam ekran, demosuz satın alma ekranı gösterilir.
+      if (!widget.apiClient.isPro) {
+        return ProPaywallScreen(
+          apiClient: widget.apiClient,
+          onProActivated: _refreshAuthState,
+          onLogout: _handleLogout,
+          languageProvider: widget.languageProvider,
+        );
+      }
+
       return AdminDashboardScreen(
         apiClient: widget.apiClient,
         onLogout: _handleLogout,

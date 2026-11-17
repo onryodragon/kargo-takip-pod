@@ -3,7 +3,7 @@ description: >-
   Huawei AppGallery (GMS Bağımsız) Çoklu İşletme Destekli (Multi-Tenant) Teslimat,
   Canlı Kurye Takip, White-Label Müşteri İzleme ve Zorunlu Teslimat Kanıtı (PoD) Sistemi.
 publish_to: "none"
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

@@ -31,6 +31,7 @@ class LanguageProvider extends ChangeNotifier {
     AppLanguage(code: 'ru', name: 'Русский', flag: '🇷🇺'),
     AppLanguage(code: 'id', name: 'Bahasa Indonesia', flag: '🇮🇩'),
     AppLanguage(code: 'pt', name: 'Português', flag: '🇵🇹'),
+    AppLanguage(code: 'zh', name: '简体中文', flag: '🇨🇳'),
   ];
 
   Locale _locale = const Locale('tr');

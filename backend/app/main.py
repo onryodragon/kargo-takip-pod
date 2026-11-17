@@ -385,6 +385,7 @@ PRIVACY_POLICY_HTML = """<!DOCTYPE html>
             <div class="lang-switch">
                 <button class="lang-btn active" onclick="switchLang('tr')">🇹🇷 Türkçe</button>
                 <button class="lang-btn" onclick="switchLang('en')">🇬🇧 English</button>
+                <button class="lang-btn" onclick="switchLang('zh')">🇨🇳 中文 (简体)</button>
             </div>
         </div>
 
@@ -510,6 +511,64 @@ PRIVACY_POLICY_HTML = """<!DOCTYPE html>
                     <p><a href="mailto:destek@kargotakip.com">destek@kargotakip.com</a> / <a href="mailto:onryodragon@users.noreply.github.com">onryodragon@users.noreply.github.com</a></p>
                 </div>
             </div>
+
+            <!-- 中文（简体）BÖLÜM - PIPL & HUAWEI APPGALLERY COMPLIANT -->
+            <div id="section-zh" class="hidden">
+                <div class="highlight-box">
+                    <strong>重要声明：</strong> 本隐私政策及个人信息保护声明严格依据《中华人民共和国个人信息保护法》(PIPL) 以及相关国际数据保护法规制定，适用于通过华为应用市场 (Huawei AppGallery) 及网页端使用“Kargo Takip PoD”的所有企业客户、配送员/骑手以及收件人。
+                </div>
+
+                <h2>1. 个人信息处理者与服务概述</h2>
+                <p><strong>应用名称：</strong> Kargo Takip PoD（货物追踪与电子签收凭证系统）<br>
+                <strong>个人信息处理者 / 开发者：</strong> Olkan Bayat<br>
+                <strong>个人信息保护与账户注销联系邮箱：</strong> <a href="mailto:destek@kargotakip.com">destek@kargotakip.com</a> / <a href="mailto:onryodragon@users.noreply.github.com">onryodragon@users.noreply.github.com</a></p>
+                <p>Kargo Takip PoD 是一套基于华为云与现代架构的多租户物流交付管理系统，向注册企业提供实时的配送骑手位置监控、现场拍照+触摸屏签名的电子交付凭证 (Proof of Delivery, PoD)，并为包裹收件人生成最长24小时有效的临时实时查看地图。</p>
+
+                <h2>2. 敏感权限申请与正当合法使用场景</h2>
+                <p>我们严格遵循最小必要原则申请设备权限，所有权限仅用于履行核心物流配送功能。我们绝不向任何第三方广告网络出售、共享或出租您的个人信息，亦不进行定向广告推送：</p>
+
+                <div class="perm-card">
+                    <span class="perm-tag">位置信息权限 (Location)</span>
+                    <h3>高精度 GPS 与后台位置权限 (ACCESS_FINE_LOCATION, ACCESS_BACKGROUND_LOCATION)</h3>
+                    <p><strong>使用场景：</strong> 仅在配送员登录并进入“开始值班并派送”状态期间在后台或前台采集经纬度坐标与行进方向。</p>
+                    <p><strong>业务目的：</strong> 用于计算最优配送路线，并在包裹处于“运输中 (in_transit)”时向收件人及企业管理员展示骑手距离和预计送达时间。一旦配送订单完成或骑手下班，系统立即停止位置采集。</p>
+                </div>
+
+                <div class="perm-card">
+                    <span class="perm-tag">相机与多媒体权限 (Camera)</span>
+                    <h3>现场拍照权限 (android.permission.CAMERA)</h3>
+                    <p><strong>使用场景：</strong> 仅在骑手到达收件地址点击“完成交付”时，用于拍摄包裹送达现场照片（如门前、前台或收件人签收处）。</p>
+                    <p><strong>业务目的：</strong> 作为不可篡改的电子交付证据（PoD 凭证），并自动附入企业每日交付归档报告中，保障交易双方权益。我们绝不读取您的个人相册私有照片。</p>
+                </div>
+
+                <div class="perm-card">
+                    <span class="perm-tag">手写签名数据 (Digital Signature)</span>
+                    <h3>触摸屏手写签名采集</h3>
+                    <p><strong>使用场景：</strong> 收件人在骑手手机屏幕上签署的电子姓名轨迹。</p>
+                    <p><strong>业务目的：</strong> 仅用于生成受保护的交付凭证图像，绝不会用于任何第三方生物特征比对或商业推广。</p>
+                </div>
+
+                <div class="perm-card">
+                    <span class="perm-tag">联系电话与通讯 (Phone & WhatsApp)</span>
+                    <h3>收件人与骑手电话号码</h3>
+                    <p><strong>使用场景：</strong> 仅用于向收件人发送包裹派送通知及临时追踪链接，以及向骑手发送加入企业的邀请码。</p>
+                </div>
+
+                <h2>3. 数据安全与24小时生命周期</h2>
+                <p>所有数据传输均采用行业标准 TLS 1.3 / HTTPS 及 WSS 加密传输。收件人专属的临时地图追踪链接在包裹交付完成后24小时自动失效，历史轨迹数据从公开追踪端永久下线，确保收件人与骑手的行踪隐私不受长久泄露风险。</p>
+
+                <h2>4. 用户权利与个人信息主体权益</h2>
+                <p>根据《中华人民共和国个人信息保护法》(PIPL) 及相关法律，您对您的个人信息享有查阅、复制、更正、补充、删除以及撤回授权同意的权利。企业管理员有权彻底导出或删除其名下的所有历史交付记录与骑手档案。</p>
+
+                <h2>5. 账户注销与个人数据彻底清除</h2>
+                <p>如需注销账户、删除企业工作空间或彻底清除所有关联的配送历史记录，请直接通过以下官方渠道联系我们的个人信息保护团队：</p>
+
+                <div class="contact-box">
+                    <h3>官方个人信息保护与技术支持邮箱</h3>
+                    <p>邮箱：<a href="mailto:destek@kargotakip.com">destek@kargotakip.com</a> / <a href="mailto:onryodragon@users.noreply.github.com">onryodragon@users.noreply.github.com</a></p>
+                    <p>我们承诺在收到您的注销或删除请求后 48 小时内核实并彻底完成系统及备份中的数据物理清除。</p>
+                </div>
+            </div>
         </div>
 
         <div class="footer">
@@ -521,25 +580,41 @@ PRIVACY_POLICY_HTML = """<!DOCTYPE html>
         function switchLang(lang) {
             const trSec = document.getElementById('section-tr');
             const enSec = document.getElementById('section-en');
+            const zhSec = document.getElementById('section-zh');
             const btns = document.querySelectorAll('.lang-btn');
             const title = document.getElementById('header-title');
             const subtitle = document.getElementById('header-subtitle');
 
-            if (lang === 'en') {
-                trSec.classList.add('hidden');
+            trSec.classList.add('hidden');
+            enSec.classList.add('hidden');
+            zhSec.classList.add('hidden');
+            btns.forEach(b => b.classList.remove('active'));
+
+            if (lang === 'zh') {
+                zhSec.classList.remove('hidden');
+                if (btns[2]) btns[2].classList.add('active');
+                title.textContent = '隐私政策与个人信息保护声明';
+                subtitle.textContent = 'Kargo Takip 实时快递与电子交付凭证 (PoD) 系统 • 更新日期：2026年11月17日';
+            } else if (lang === 'en') {
                 enSec.classList.remove('hidden');
-                btns[0].classList.remove('active');
-                btns[1].classList.add('active');
+                if (btns[1]) btns[1].classList.add('active');
                 title.textContent = 'Privacy Policy & Data Protection Statement';
-                subtitle.textContent = 'Cargo Tracking & Live Courier PoD System • Last Updated: November 15, 2026';
+                subtitle.textContent = 'Cargo Tracking & Live Courier PoD System • Last Updated: November 17, 2026';
             } else {
-                enSec.classList.add('hidden');
                 trSec.classList.remove('hidden');
-                btns[1].classList.remove('active');
-                btns[0].classList.add('active');
+                if (btns[0]) btns[0].classList.add('active');
                 title.textContent = 'Gizlilik Politikası & KVKK Aydınlatma Metni';
-                subtitle.textContent = 'Kargo Takip & Canlı Kurye POD Sistemi • Son Güncelleme: 15 Kasım 2026';
+                subtitle.textContent = 'Kargo Takip & Canlı Kurye POD Sistemi • Son Güncelleme: 17 Kasım 2026';
             }
+        }
+
+        // URL parametresi veya tarayıcı diline göre otomatik Çince algılama
+        const urlParams = new URLSearchParams(window.location.search);
+        const reqLang = urlParams.get('lang');
+        if (reqLang === 'zh' || (!reqLang && navigator.language && navigator.language.startsWith('zh'))) {
+            switchLang('zh');
+        } else if (reqLang === 'en' || (!reqLang && navigator.language && navigator.language.startsWith('en'))) {
+            switchLang('en');
         }
     </script>
 </body>

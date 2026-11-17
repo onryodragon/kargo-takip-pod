@@ -61,7 +61,8 @@ class _FirstLaunchPrivacyGateState extends State<FirstLaunchPrivacyGate> {
 
   Future<void> _openWebPrivacyPolicy() async {
     final base = ApiClient.baseUrl.replaceAll(RegExp(r'/api/v1/?$'), '');
-    final uri = Uri.parse('$base/privacy');
+    final langCode = widget.languageProvider?.currentCode ?? 'tr';
+    final uri = Uri.parse('$base/privacy?lang=$langCode');
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {
@@ -176,177 +177,174 @@ class _FirstLaunchPrivacyGateState extends State<FirstLaunchPrivacyGate> {
                   // İçerik Alanı
                   Padding(
                     padding: const EdgeInsets.all(22),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Geliştirici & Veri Sorumlusu Rozeti
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'GELİŞTİRİCİ VE VERİ SORUMLUSU BİLGİSİ:',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF475569),
-                                ),
+                    child: Builder(
+                      builder: (ctx) {
+                        final l10n = AppLocalizations.of(ctx);
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Geliştirici & Veri Sorumlusu Rozeti
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
                               ),
-                              SizedBox(height: 4),
-                              Text(
-                                '• Veri Sorumlusu: Olkan Bayat\n'
-                                '• İletişim: destek@kargotakip.com\n'
-                                '• Destek & Silme: onryodragon@users.noreply.github.com',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  height: 1.45,
-                                  color: Color(0xFF1E293B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        const Text(
-                          'Uygulamamızın çalışabilmesi için yalnızca aşağıdaki meşru amaçlarla veri işlenmektedir:',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF334155),
-                            height: 1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // İzinler Listesi
-                        _buildPermRow(
-                          icon: Icons.location_on_rounded,
-                          color: const Color(0xFF2563EB),
-                          title: 'Hassas & Arka Plan Konum',
-                          desc:
-                              'Yalnızca kuryeler aktif teslimata çıktığında paketin varışını müşteriye canlı haritada göstermek ve rota optimizasyonu için kullanılır.',
-                        ),
-                        const SizedBox(height: 10),
-                        _buildPermRow(
-                          icon: Icons.camera_alt_rounded,
-                          color: const Color(0xFF059669),
-                          title: 'Kamera İzni',
-                          desc:
-                              'Kuryenin teslimat anında koli/paket teslim durumunu fotoğraflayarak teslimat kanıtı (PoD) tutanağı oluşturması için kullanılır.',
-                        ),
-                        const SizedBox(height: 10),
-                        _buildPermRow(
-                          icon: Icons.draw_rounded,
-                          color: const Color(0xFFD97706),
-                          title: 'Ekrana Dijital İmza',
-                          desc:
-                              'Paket teslim edilirken alıcının dokunmatik ekran üzerinden teslimat onay imzasını kaydetmek için kullanılır.',
-                        ),
-                        const SizedBox(height: 10),
-                        _buildPermRow(
-                          icon: Icons.phone_android_rounded,
-                          color: const Color(0xFF7C3AED),
-                          title: 'Telefon Numarası',
-                          desc:
-                              'Müşteriye SMS/WhatsApp ile takip bağlantısı iletmek ve kurye davetiye kodu göndermek için kullanılır.',
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Web Linki
-                        Center(
-                          child: InkWell(
-                            onTap: _openWebPrivacyPolicy,
-                            borderRadius: BorderRadius.circular(8),
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(
-                                    Icons.open_in_new_rounded,
-                                    size: 14,
-                                    color: Color(0xFF0077FF),
-                                  ),
-                                  SizedBox(width: 6),
                                   Text(
-                                    'Gizlilik Politikasının Tam Metnini Web\'de İncele',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF0077FF),
+                                    l10n.privacyDeveloperInfo,
+                                    style: const TextStyle(
+                                      fontSize: 11,
                                       fontWeight: FontWeight.bold,
-                                      decoration: TextDecoration.underline,
+                                      color: Color(0xFF475569),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    l10n.privacyDeveloperDetails,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      height: 1.45,
+                                      color: Color(0xFF1E293B),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
+                            const SizedBox(height: 16),
 
-                        // Butonlar
-                        Row(
-                          children: [
-                            Expanded(
-                              flex: 2,
-                              child: OutlinedButton(
-                                onPressed: () => SystemNavigator.pop(),
-                                style: OutlinedButton.styleFrom(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 14),
-                                  side: const BorderSide(
-                                    color: Color(0xFFCBD5E1),
+                            Text(
+                              l10n.privacyLegitimatePurpose,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF334155),
+                                height: 1.4,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+
+                            // İzinler Listesi
+                            _buildPermRow(
+                              icon: Icons.location_on_rounded,
+                              color: const Color(0xFF2563EB),
+                              title: l10n.privacyPermLocationTitle,
+                              desc: l10n.privacyPermLocationDesc,
+                            ),
+                            const SizedBox(height: 10),
+                            _buildPermRow(
+                              icon: Icons.camera_alt_rounded,
+                              color: const Color(0xFF059669),
+                              title: l10n.privacyPermCameraTitle,
+                              desc: l10n.privacyPermCameraDesc,
+                            ),
+                            const SizedBox(height: 10),
+                            _buildPermRow(
+                              icon: Icons.draw_rounded,
+                              color: const Color(0xFFD97706),
+                              title: l10n.privacyPermSignTitle,
+                              desc: l10n.privacyPermSignDesc,
+                            ),
+                            const SizedBox(height: 10),
+                            _buildPermRow(
+                              icon: Icons.phone_android_rounded,
+                              color: const Color(0xFF7C3AED),
+                              title: l10n.privacyPermPhoneTitle,
+                              desc: l10n.privacyPermPhoneDesc,
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Web Linki
+                            Center(
+                              child: InkWell(
+                                onTap: _openWebPrivacyPolicy,
+                                borderRadius: BorderRadius.circular(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
                                   ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: Text(
-                                  AppLocalizations.of(context).privacyRejectBtn,
-                                  style: const TextStyle(
-                                    color: Color(0xFF64748B),
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.open_in_new_rounded,
+                                        size: 14,
+                                        color: Color(0xFF0077FF),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        l10n.privacyWebLink,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF0077FF),
+                                          fontWeight: FontWeight.bold,
+                                          decoration: TextDecoration.underline,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              flex: 3,
-                              child: ElevatedButton(
-                                onPressed: _acceptPrivacyPolicy,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF0077FF),
-                                  foregroundColor: Colors.white,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                            const SizedBox(height: 20),
+
+                            // Butonlar
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 2,
+                                  child: OutlinedButton(
+                                    onPressed: () => SystemNavigator.pop(),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      side: const BorderSide(
+                                        color: Color(0xFFCBD5E1),
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      l10n.privacyRejectBtn,
+                                      style: const TextStyle(
+                                        color: Color(0xFF64748B),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
                                   ),
-                                  elevation: 2,
                                 ),
-                                child: Text(
-                                  AppLocalizations.of(context).privacyAcceptBtn,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13.5,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 3,
+                                  child: ElevatedButton(
+                                    onPressed: _acceptPrivacyPolicy,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0077FF),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      elevation: 2,
+                                    ),
+                                    child: Text(
+                                      l10n.privacyAcceptBtn,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13.5,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
                           ],
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   ),
                 ],

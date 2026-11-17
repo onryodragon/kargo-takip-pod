@@ -115,6 +115,29 @@ class ApiClient {
   Map<String, dynamic>? _rawTenantMap;
   Map<String, dynamic>? get rawTenantMap => _rawTenantMap;
 
+  bool _isProLocally = false;
+
+  /// PRO Lisans Durumu:
+  /// - Kurye (driver) hesapları kilit ekranını bypass eder.
+  /// - Huawei test hesabı (appgallery_admin@kargotakip.com) otomatik bypass edilir.
+  /// - Normal yöneticiler 10 Euro ömür boyu (pro_lifetime_10eur) lisans alana kadar kilit ekranında kalır.
+  bool get isPro {
+    if (userRole == 'driver') return true;
+
+    final email = (_currentUser?['email'] ?? '').toString().trim().toLowerCase();
+    if (email == 'appgallery_admin@kargotakip.com') return true;
+
+    if (_isProLocally) return true;
+    if (_currentUser?['is_pro'] == true || _currentUser?['is_pro'] == 1) return true;
+    if (_rawTenantMap?['is_pro'] == true || _rawTenantMap?['is_pro'] == 1) return true;
+
+    return false;
+  }
+
+  void setProLocally(bool pro) {
+    _isProLocally = pro;
+  }
+
   Map<String, String> get _authHeaders => {
         'Content-Type': 'application/json',
         'Accept-Language': currentLanguage,
@@ -128,6 +151,7 @@ class ApiClient {
     final prefs = await SharedPreferences.getInstance();
     _customBaseUrl = prefs.getString(_prefBaseUrlKey);
     _accessToken = prefs.getString(_prefTokenKey);
+    _isProLocally = prefs.getBool('pod_is_pro_lifetime_active') ?? false;
     final userRaw = prefs.getString(_prefUserKey);
     final tenantRaw = prefs.getString(_prefTenantKey);
 
@@ -157,18 +181,79 @@ class ApiClient {
     await prefs.setString(_prefTokenKey, token);
     await prefs.setString(_prefUserKey, jsonEncode(user));
     await prefs.setString(_prefTenantKey, jsonEncode(tenant));
+    if (tenant['is_pro'] == true || tenant['is_pro'] == 1 || user['is_pro'] == true || user['is_pro'] == 1) {
+      _isProLocally = true;
+      await prefs.setBool('pod_is_pro_lifetime_active', true);
+    }
   }
 
   Future<void> logout() async {
     _accessToken = null;
     _currentUser = null;
     _currentTenant = null;
+    _isProLocally = false;
     themeController.resetToDefault();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_prefTokenKey);
     await prefs.remove(_prefUserKey);
     await prefs.remove(_prefTenantKey);
+  }
+
+  /// Huawei IAP ile 10 Euro Ömür Boyu Kullanım satın alındığında backend aktivasyonu yapar
+  Future<bool> activatePro({String productId = 'pro_lifetime_10eur', String? purchaseToken}) async {
+    final uri = Uri.parse('$baseUrl/api/v1/tenants/activate-pro');
+    try {
+      final response = await http.post(
+        uri,
+        headers: _authHeaders,
+        body: jsonEncode({
+          'product_id': productId,
+          if (purchaseToken != null) 'purchase_token': purchaseToken,
+        }),
+      );
+      if (response.statusCode == 200) {
+        _isProLocally = true;
+        if (_currentUser != null) {
+          _currentUser!['is_pro'] = true;
+        }
+        if (_rawTenantMap != null) {
+          _rawTenantMap!['is_pro'] = true;
+        }
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('pod_is_pro_lifetime_active', true);
+        if (_currentUser != null) {
+          await prefs.setString(_prefUserKey, jsonEncode(_currentUser));
+        }
+        if (_rawTenantMap != null) {
+          await prefs.setString(_prefTenantKey, jsonEncode(_rawTenantMap));
+        }
+        return true;
+      }
+    } catch (e) {
+      debugPrint('ApiClient activatePro error: $e');
+    }
+    return false;
+  }
+
+  /// Sunucudan en güncel PRO lisans durumunu sorgular
+  Future<bool> checkProStatus() async {
+    final uri = Uri.parse('$baseUrl/api/v1/tenants/pro-status');
+    try {
+      final response = await http.get(uri, headers: _authHeaders);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map<String, dynamic> && data['is_pro'] == true) {
+          _isProLocally = true;
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('pod_is_pro_lifetime_active', true);
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('ApiClient checkProStatus error: $e');
+    }
+    return false;
   }
 
   // ---------------------------------------------------------------------------

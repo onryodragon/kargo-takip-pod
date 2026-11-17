@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     smtp_user       TEXT,
     smtp_password   TEXT,
     language        TEXT DEFAULT 'tr',
+    is_pro          INTEGER NOT NULL DEFAULT 0,
     is_active       INTEGER NOT NULL DEFAULT 1,
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
@@ -93,6 +94,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_whatsapp_verified    INTEGER NOT NULL DEFAULT 0,
     google_sub              TEXT,
     language                TEXT DEFAULT 'tr',
+    is_pro                  INTEGER NOT NULL DEFAULT 0,
     is_active               INTEGER NOT NULL DEFAULT 1,
     is_online               INTEGER NOT NULL DEFAULT 0,
     last_lat                REAL,
@@ -254,12 +256,19 @@ class MultiTenantRepository:
                     "ALTER TABLE users ADD COLUMN last_heading REAL DEFAULT 0",
                     "ALTER TABLE tenants ADD COLUMN language TEXT DEFAULT 'tr'",
                     "ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'tr'",
+                    "ALTER TABLE tenants ADD COLUMN is_pro INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE users ADD COLUMN is_pro INTEGER NOT NULL DEFAULT 0",
                 ]
                 for stmt in migrations:
                     try:
                         conn.execute(stmt)
                     except Exception:
                         pass
+                try:
+                    conn.execute("UPDATE tenants SET is_pro = 1 WHERE report_email = 'appgallery_admin@kargotakip.com'")
+                    conn.execute("UPDATE users SET is_pro = 1 WHERE email = 'appgallery_admin@kargotakip.com'")
+                except Exception:
+                    pass
                 conn.commit()
 
     def reset_local_database(self) -> None:
@@ -578,6 +587,7 @@ class MultiTenantRepository:
             "primary_color",
             "phone",
             "language",
+            "is_pro",
             "smtp_host",
             "smtp_port",
             "smtp_user",
@@ -603,6 +613,33 @@ class MultiTenantRepository:
             conn.execute(f"UPDATE tenants SET {set_clause} WHERE id = ?", values)
             conn.commit()
             return self.get_tenant_by_id(tenant_id)
+
+    def activate_pro(self, tenant_id: str, user_id: Optional[str] = None) -> bool:
+        """Huawei IAP ile 10 Euro Ömür Boyu Kullanım (pro_lifetime_10eur) satın alındığında işletmeyi ve kullanıcıyı Pro yapar."""
+        if self._supabase:
+            try:
+                self._supabase.table("tenants").update({"is_pro": True}).eq("id", tenant_id).execute()
+                if user_id:
+                    self._supabase.table("users").update({"is_pro": True}).eq("id", user_id).execute()
+            except Exception as exc:
+                logger.warning("Supabase activate_pro error: %s", exc)
+
+        with self._lock, self._get_sqlite_conn() as conn:
+            conn.execute("UPDATE tenants SET is_pro = 1 WHERE id = ?", (tenant_id,))
+            if user_id:
+                conn.execute("UPDATE users SET is_pro = 1 WHERE id = ?", (user_id,))
+            conn.commit()
+        return True
+
+    def is_tenant_pro(self, tenant_id: str, user_email: Optional[str] = None) -> bool:
+        """İşletmenin veya kullanıcının Pro lisansı olup olmadığını doğrular."""
+        if user_email and user_email.strip().lower() == "appgallery_admin@kargotakip.com":
+            return True
+        try:
+            tenant = self.get_tenant_by_id(tenant_id)
+            return bool(tenant.get("is_pro", False))
+        except Exception:
+            return False
 
     def create_driver(
         self,

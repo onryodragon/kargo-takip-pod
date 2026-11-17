@@ -27,6 +27,7 @@ class AppLocalizations {
     Locale('ru'),
     Locale('id'),
     Locale('pt'),
+    Locale('zh'),
   ];
 
   static bool isSupported(Locale locale) {
@@ -139,6 +140,40 @@ class AppLocalizations {
   String get deliveredSuccess => text('delivered_success');
   String get linkExpired => text('link_expired');
 
+  // PRO Paywall Getters
+  String get proTitle => text('pro_title');
+  String get proBadge => text('pro_badge');
+  String get proSubtitle => text('pro_subtitle');
+  String get proPriceVal => text('pro_price_val');
+  String get proPriceDesc => text('pro_price_desc');
+  String get proFeat1 => text('pro_feat_1');
+  String get proFeat2 => text('pro_feat_2');
+  String get proFeat3 => text('pro_feat_3');
+  String get proFeat4 => text('pro_feat_4');
+  String get proFeat5 => text('pro_feat_5');
+  String get proFeat6 => text('pro_feat_6');
+  String get proBuyBtn => text('pro_buy_btn');
+  String get proRestoreBtn => text('pro_restore_btn');
+  String get proLogoutBtn => text('pro_logout_btn');
+  String get proProcessing => text('pro_processing');
+  String get proSuccess => text('pro_success');
+  String get proNotFound => text('pro_not_found');
+  String get proError => text('pro_error');
+
+  // Gizlilik İlk Açılış Getters
+  String get privacyWebLink => text('privacy_web_link');
+  String get privacyPermLocationTitle => text('privacy_perm_location_title');
+  String get privacyPermLocationDesc => text('privacy_perm_location_desc');
+  String get privacyPermCameraTitle => text('privacy_perm_camera_title');
+  String get privacyPermCameraDesc => text('privacy_perm_camera_desc');
+  String get privacyPermSignTitle => text('privacy_perm_sign_title');
+  String get privacyPermSignDesc => text('privacy_perm_sign_desc');
+  String get privacyPermPhoneTitle => text('privacy_perm_phone_title');
+  String get privacyPermPhoneDesc => text('privacy_perm_phone_desc');
+  String get privacyDeveloperInfo => text('privacy_developer_info');
+  String get privacyDeveloperDetails => text('privacy_developer_details');
+  String get privacyLegitimatePurpose => text('privacy_legitimate_purpose');
+
   // ---------------------------------------------------------------------------
   // ÇOK DİLLİ METİN TABLOSU (9 DİL)
   // ---------------------------------------------------------------------------
@@ -226,6 +261,36 @@ class AppLocalizations {
       'delivery_address': 'Teslimat Adresi',
       'delivered_success': 'Siparişiniz başarıyla teslim edilmiştir. Bizi tercih ettiğiniz için teşekkür ederiz!',
       'link_expired': 'Bu teslimat tamamlandı, takip bağlantısının süresi doldu.',
+      'pro_title': 'Kargo Takip PoD PRO',
+      'pro_badge': 'ÖMÜR BOYU TAM ERİŞİM',
+      'pro_subtitle': 'İşletmeniz İçin Sınırsız Kurye ve Canlı Teslimat Altyapısı',
+      'pro_price_val': '10 €',
+      'pro_price_desc': 'Tek Seferlik Ödeme • Ömür Boyu Kullanım • Aylık/Yıllık Ücret Yok',
+      'pro_feat_1': 'Sınırsız Kurye, Şirket ve Sipariş Yönetimi',
+      'pro_feat_2': '24 Saatlik Canlı Kurye Haritası & Akıllı Rota Sıralama',
+      'pro_feat_3': 'Zorunlu Teslimat Kanıtı (PoD: Fotoğraf + Ekrana İmza)',
+      'pro_feat_4': 'Otomatik Excel Arşivleme ve Günlük Rapor E-postaları',
+      'pro_feat_5': 'Müşteriye Özel White-Label Canlı Takip Sayfası',
+      'pro_feat_6': 'Huawei Bulut Altyapısı & Kesintisiz Güvenlik',
+      'pro_buy_btn': 'Ömür Boyu Satın Al (10 €)',
+      'pro_restore_btn': 'Satın Alımı Geri Yükle',
+      'pro_logout_btn': 'Hesaptan Çıkış Yap',
+      'pro_processing': 'Huawei IAP satın alma işlemi başlatılıyor...',
+      'pro_success': 'Pro Lifetime lisansınız başarıyla aktif edildi! Hoş geldiniz.',
+      'pro_not_found': 'Hesabınıza ait aktif bir satın alım bulunamadı.',
+      'pro_error': 'Satın alma tamamlanamadı veya iptal edildi.',
+      'privacy_web_link': 'Gizlilik Politikasının Tam Metnini Web\'de İncele',
+      'privacy_perm_location_title': 'Hassas & Arka Plan Konum',
+      'privacy_perm_location_desc': 'Yalnızca kuryeler aktif teslimata çıktığında paketin varışını müşteriye canlı haritada göstermek ve rota optimizasyonu için kullanılır.',
+      'privacy_perm_camera_title': 'Kamera İzni',
+      'privacy_perm_camera_desc': 'Kuryenin teslimat anında koli/paket teslim durumunu fotoğraflayarak teslimat kanıtı (PoD) tutanağı oluşturması için kullanılır.',
+      'privacy_perm_sign_title': 'Ekrana Dijital İmza',
+      'privacy_perm_sign_desc': 'Paket teslim edilirken alıcının dokunmatik ekran üzerinden teslimat onay imzasını kaydetmek için kullanılır.',
+      'privacy_perm_phone_title': 'Telefon Numarası',
+      'privacy_perm_phone_desc': 'Müşteriye SMS/WhatsApp ile takip bağlantısı iletmek ve kurye davetiye kodu göndermek için kullanılır.',
+      'privacy_developer_info': 'GELİŞTİRİCİ VE VERİ SORUMLUSU BİLGİSİ:',
+      'privacy_developer_details': '• Veri Sorumlusu: Olkan Bayat\n• İletişim: destek@kargotakip.com\n• Destek & Silme: onryodragon@users.noreply.github.com',
+      'privacy_legitimate_purpose': 'Uygulamamızın çalışabilmesi için yalnızca aşağıdaki meşru amaçlarla veri işlenmektedir:',
     },
 
     // 2. ENGLISH (en)
@@ -311,6 +376,36 @@ class AppLocalizations {
       'delivery_address': 'Delivery Address',
       'delivered_success': 'Your order has been delivered successfully. Thank you for choosing us!',
       'link_expired': 'This delivery is complete, tracking link has expired.',
+      'pro_title': 'Kargo Takip PoD PRO',
+      'pro_badge': 'LIFETIME FULL ACCESS',
+      'pro_subtitle': 'Unlimited Couriers & Live Delivery Infrastructure for Your Enterprise',
+      'pro_price_val': '10 €',
+      'pro_price_desc': 'One-Time Payment • Lifetime Use • No Recurring Fees',
+      'pro_feat_1': 'Unlimited Couriers, Enterprises & Delivery Orders',
+      'pro_feat_2': '24-Hour Live Courier Map & Smart Route Optimization',
+      'pro_feat_3': 'Mandatory Proof of Delivery (PoD: Photo + Signature)',
+      'pro_feat_4': 'Automated Excel Archiving & Daily Report Emails',
+      'pro_feat_5': 'White-Label Live Tracking Web Portal for Customers',
+      'pro_feat_6': 'Huawei Cloud Infrastructure & Continuous Security',
+      'pro_buy_btn': 'Purchase Lifetime Access (10 €)',
+      'pro_restore_btn': 'Restore Purchase',
+      'pro_logout_btn': 'Sign Out',
+      'pro_processing': 'Initiating Huawei IAP checkout...',
+      'pro_success': 'Pro Lifetime license successfully activated! Welcome aboard.',
+      'pro_not_found': 'No existing purchase found for your Huawei ID.',
+      'pro_error': 'Purchase could not be completed or was cancelled.',
+      'privacy_web_link': 'Review Full Privacy Policy on Web',
+      'privacy_perm_location_title': 'Precise & Background Location',
+      'privacy_perm_location_desc': 'Used strictly when couriers are on active delivery duty to display parcel approach to recipients and calculate routing.',
+      'privacy_perm_camera_title': 'Camera Permission',
+      'privacy_perm_camera_desc': 'Used at the moment of delivery to photograph parcel handover as Proof of Delivery (PoD).',
+      'privacy_perm_sign_title': 'Touchscreen Signature',
+      'privacy_perm_sign_desc': 'Used for recipients to sign their delivery confirmation on the touchscreen upon receiving goods.',
+      'privacy_perm_phone_title': 'Phone Number',
+      'privacy_perm_phone_desc': 'Used to dispatch tracking links to recipients via SMS/WhatsApp and invite couriers to enterprise workspaces.',
+      'privacy_developer_info': 'DEVELOPER & DATA CONTROLLER INFORMATION:',
+      'privacy_developer_details': '• Data Controller: Olkan Bayat\n• Contact: destek@kargotakip.com\n• Support & Data Deletion: onryodragon@users.noreply.github.com',
+      'privacy_legitimate_purpose': 'Our app processes personal data strictly for the following legitimate logistical purposes:',
     },
 
     // 3. GERMAN (de)
@@ -906,6 +1001,121 @@ class AppLocalizations {
       'delivery_address': 'Endereço de Entrega',
       'delivered_success': 'Seu pedido foi entregue com sucesso! Obrigado pela preferência.',
       'link_expired': 'Esta entrega foi concluída. O link de rastreamento expirou.',
+    },
+
+    // 10. SIMPLIFIED CHINESE (zh) - PIPL & HUAWEI APPGALLERY
+    'zh': {
+      'app_title': 'Kargo Takip PoD',
+      'ok': '确定',
+      'cancel': '取消',
+      'save': '保存',
+      'close': '关闭',
+      'error': '错误',
+      'success': '成功',
+      'loading': '加载中...',
+      'retry': '重试',
+      'search': '搜索...',
+      'back': '返回',
+      'logout': '退出登录',
+      'delete': '删除',
+      'confirm': '确认',
+      'copy': '复制',
+      'copied': '已复制到剪贴板！',
+      'privacy_title': '用户协议与个人信息保护声明',
+      'privacy_subtitle': '在继续使用前，请仔细阅读并同意服务条款与隐私政策。',
+      'privacy_accept_btn': '同意并继续',
+      'privacy_reject_btn': '不同意并退出',
+      'privacy_terms_btn': '阅读协议全文',
+      'privacy_kvkk_notice': '本应用严格遵守《中华人民共和国个人信息保护法》(PIPL) 与相关国际数据保护法规。注册企业作为其配送骑手、客户及订单数据的个人信息处理者，承担相应的主体法定义务。',
+      'login': '登录',
+      'register': '注册新企业',
+      'email': '电子邮箱',
+      'password': '密码',
+      'phone': '手机号码',
+      'full_name': '姓名',
+      'company_name': '企业 / 公司名称',
+      'vehicle_plate': '车牌号',
+      'vehicle_type': '车辆类型',
+      'forgot_password': '忘记密码',
+      'reset_password': '重置密码',
+      'send_code': '发送验证码',
+      'enter_code': '输入6位验证码',
+      'new_password': '新密码',
+      'kvkk_checkbox': '我已阅读并完全同意《使用条款》与《个人信息保护声明》。',
+      'byos_title': '连接您的独立专属服务器',
+      'byos_desc': '100%自主掌控您的业务数据。在Render上一键创建免费专属云服务器。',
+      'byos_btn': '一键创建专属服务器',
+      'byos_step1': '1. 在打开的页面中使用您的Render账户登录。',
+      'byos_step2': '2. 输入企业名称并点击白色“Deploy Blueprint”按钮。',
+      'byos_step3': '3. 复制生成的 https://....onrender.com 地址并粘贴于此。',
+      'byos_detected': '已自动检测到剪贴板中的Render服务器地址！',
+      'byos_url_label': '专属服务器 API 地址',
+      'tab_orders': '配送订单',
+      'tab_drivers': '骑手管理',
+      'tab_map': '实时地图',
+      'tab_settings': '系统设置',
+      'new_order': '新建订单',
+      'batch_import': '批量导入Excel',
+      'export_excel': '导出Excel交付报告',
+      'assign_driver': '指派给骑手',
+      'driver_invite': '邀请新骑手',
+      'invite_btn': '通过WhatsApp发送邀请',
+      'available_drivers': '空闲骑手',
+      'busy_drivers': '派送中骑手',
+      'all_drivers': '全部骑手',
+      'driver_list_empty': '暂无已注册骑手。',
+      'order_list_empty': '暂无配送订单。',
+      'status_pending': '待分配',
+      'status_in_transit': '配送中',
+      'status_delivered': '已送达',
+      'status_cancelled': '已取消',
+      'my_tasks': '我的配送任务',
+      'start_route': '开始派送路线',
+      'complete_delivery': '完成送达签收 (PoD)',
+      'recipient_name': '签收人姓名',
+      'take_photo': '现场拍照凭证 (PoD)',
+      'sign_here': '客户手写签名（在此签名）',
+      'clear_signature': '清除签名',
+      'submit_pod': '保存凭据并完成订单',
+      'photo_required': '请拍摄送达凭证照片。',
+      'signature_required': '请采集收件人电子签名。',
+      'tracking_title': '实时订单追踪',
+      'order_status': '订单状态',
+      'courier_on_way': '配送骑手已出发，正在向您送达！',
+      'courier_live_location': '骑手实时位置',
+      'delivery_address': '送达地址',
+      'delivered_success': '您的订单已成功送达！感谢您的信任与支持。',
+      'link_expired': '本订单已完成，临时追踪链接已失效。',
+      'pro_title': 'Kargo Takip PoD 专业版',
+      'pro_badge': '终身完全访问',
+      'pro_subtitle': '为您的企业提供无限制骑手与实时交付管理基础设施',
+      'pro_price_val': '10 €',
+      'pro_price_desc': '一次性支付 • 终身使用 • 无月费/年费',
+      'pro_feat_1': '无限制骑手、企业与配送订单管理',
+      'pro_feat_2': '24小时实时骑手地图与智能路线排序',
+      'pro_feat_3': '强制电子交付凭证 (PoD: 现场照片 + 触摸屏签名)',
+      'pro_feat_4': '自动Excel归档与每日交付报告邮件',
+      'pro_feat_5': '面向客户的品牌专属实时追踪页面',
+      'pro_feat_6': '华为云基础设施与不间断安全保障',
+      'pro_buy_btn': '购买终身版 (10 €)',
+      'pro_restore_btn': '恢复购买',
+      'pro_logout_btn': '退出登录',
+      'pro_processing': '正在发起华为应用内购买...',
+      'pro_success': '专业终身版已成功激活！欢迎使用。',
+      'pro_not_found': '未找到您华为账号名下的有效购买记录。',
+      'pro_error': '购买未能完成或已被取消。',
+      'privacy_web_link': '在网页中查看完整隐私政策',
+      'privacy_perm_location_title': '精准与后台位置信息',
+      'privacy_perm_location_desc': '仅在骑手处于激活配送状态时用于向收件人展示包裹实时位置并计算最优路线。',
+      'privacy_perm_camera_title': '相机拍摄权限',
+      'privacy_perm_camera_desc': '仅在骑手送达时用于拍摄包裹交接现场作为电子交付凭证 (PoD)。',
+      'privacy_perm_sign_title': '触摸屏手写电子签名',
+      'privacy_perm_sign_desc': '用于收件人在签收包裹时在屏幕上签署确认凭证。',
+      'privacy_perm_phone_title': '手机联系方式',
+      'privacy_perm_phone_desc': '用于向客户发送派送追踪链接以及向骑手发送工作空间邀请。',
+      'privacy_developer_info': '个人信息处理者与开发者信息：',
+      'privacy_developer_details': '• 个人信息处理者：Olkan Bayat\n• 官方联系邮箱：destek@kargotakip.com\n• 技术支持与数据注销：onryodragon@users.noreply.github.com',
+      'privacy_legitimate_purpose': '我们的应用严格仅为以下合法的物流派送目的处理最小必要数据：',
     },
   };
 }
